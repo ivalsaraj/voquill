@@ -10,6 +10,7 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
+import AutoFixHighOutlined from "@mui/icons-material/AutoFixHighOutlined";
 import { useCallback, useEffect } from "react";
 import { FormattedMessage, useIntl } from "react-intl";
 import {
@@ -32,6 +33,8 @@ import {
 import { useAppStore } from "../../store";
 import { CPU_DEVICE_VALUE, type TranscriptionMode } from "../../types/ai.types";
 import { getAllowsChangeTranscription } from "../../utils/enterprise.utils";
+import { isCombinedGeminiModeEligible } from "../../utils/combined-mode.utils";
+import { getGenerativePrefs } from "../../utils/user.utils";
 import { formatSize } from "../../utils/format.utils";
 import { type LocalSidecarDownloadSnapshot } from "../../sidecars";
 import {
@@ -122,6 +125,34 @@ export const AITranscriptionConfiguration = ({
   const intl = useIntl();
   const transcription = useAppStore((state) => state.settings.aiTranscription);
   const allowChange = useAppStore(getAllowsChangeTranscription);
+
+  const showGeminiRecommendation = useAppStore((state) => {
+    if (state.settings.aiTranscription.mode !== "api") return false;
+    const selectedKey = state.settings.apiKeys.find(
+      (k) => k.id === state.settings.aiTranscription.selectedApiKeyId,
+    );
+    if (selectedKey?.provider !== "gemini") return false;
+
+    const gPrefs = getGenerativePrefs(state);
+    const isAlreadyCombined = isCombinedGeminiModeEligible({
+      transcription: {
+        mode: "api",
+        provider: "gemini",
+        apiKeyId: selectedKey.id,
+        transcriptionModel: selectedKey.transcriptionModel ?? null,
+      },
+      postProcessing:
+        gPrefs.mode === "api"
+          ? {
+              mode: "api",
+              provider: gPrefs.provider,
+              apiKeyId: gPrefs.apiKeyId,
+              postProcessingModel: gPrefs.postProcessingModel,
+            }
+          : { mode: gPrefs.mode },
+    });
+    return !isAlreadyCombined;
+  });
   const localTranscriptionConfig = transcription.localModelManagement;
 
   const hasSelectedDevice = transcription.availableDevices.some(
@@ -534,6 +565,27 @@ export const AITranscriptionConfiguration = ({
           onChange={handleApiKeyChange}
           context="transcription"
         />
+      )}
+
+      {showGeminiRecommendation && (
+        <Stack
+          direction="row"
+          alignItems="flex-start"
+          spacing={1.5}
+          sx={{
+            p: 1.5,
+            borderRadius: 1,
+            bgcolor: "action.hover",
+          }}
+        >
+          <AutoFixHighOutlined
+            fontSize="small"
+            sx={{ color: "info.main", mt: 0.25 }}
+          />
+          <Typography variant="caption" color="text.secondary">
+            <FormattedMessage defaultMessage="This Gemini key supports post-processing too. Set post-processing to use the same key for combined mode — one request instead of two, with faster results." />
+          </Typography>
+        </Stack>
       )}
 
       {transcription.mode === "cloud" && <VoquillCloudSetting />}

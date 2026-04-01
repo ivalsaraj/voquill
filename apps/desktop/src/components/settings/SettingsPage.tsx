@@ -3,6 +3,7 @@ import {
   ArrowOutwardRounded,
   AutoAwesomeOutlined,
   AutoFixHighOutlined,
+  BoltOutlined,
   DeleteForeverOutlined,
   DescriptionOutlined,
   Edit,
@@ -48,6 +49,7 @@ import {
   getAllowsChangePostProcessing,
   getAllowsChangeTranscription,
 } from "../../utils/enterprise.utils";
+import { isCombinedGeminiModeEligible } from "../../utils/combined-mode.utils";
 import { getAdditionalLanguageEntries } from "../../utils/keyboard.utils";
 import {
   DICTATION_LANGUAGE_OPTIONS,
@@ -61,6 +63,7 @@ import {
   getHasEmailProvider,
   getIsSignedIn,
   getMyUser,
+  getTranscriptionPrefs,
 } from "../../utils/user.utils";
 import { ListTile } from "../common/ListTile";
 import { Section } from "../common/Section";
@@ -72,6 +75,32 @@ export default function SettingsPage() {
   const isEnterprise = useAppStore((state) => state.isEnterprise);
   const allowChangeTranscription = useAppStore(getAllowsChangeTranscription);
   const allowChangePostProcessing = useAppStore(getAllowsChangePostProcessing);
+  const isCombinedMode = useAppStore((state) => {
+    if (state.enterpriseConfig?.allowPostProcessing === false) return false;
+
+    const tPrefs = getTranscriptionPrefs(state);
+    const gPrefs = getGenerativePrefs(state);
+    return isCombinedGeminiModeEligible({
+      transcription:
+        tPrefs.mode === "api"
+          ? {
+              mode: "api",
+              provider: tPrefs.provider,
+              apiKeyId: tPrefs.apiKeyId,
+              transcriptionModel: tPrefs.transcriptionModel,
+            }
+          : { mode: tPrefs.mode },
+      postProcessing:
+        gPrefs.mode === "api"
+          ? {
+              mode: "api",
+              provider: gPrefs.provider,
+              apiKeyId: gPrefs.apiKeyId,
+              postProcessingModel: gPrefs.postProcessingModel,
+            }
+          : { mode: gPrefs.mode },
+    });
+  });
   const supportsPasteKeybinds = useAppStore(
     (state) => state.supportsPasteKeybinds,
   );
@@ -406,6 +435,19 @@ export default function SettingsPage() {
           leading={<AutoFixHighOutlined />}
           onClick={openPostProcessingDialog}
         />
+      )}
+      {isCombinedMode && (
+        <Stack
+          direction="row"
+          alignItems="center"
+          spacing={1}
+          sx={{ px: 2, py: 1 }}
+        >
+          <BoltOutlined fontSize="small" sx={{ color: "success.main" }} />
+          <Typography variant="caption" color="text.secondary">
+            <FormattedMessage defaultMessage="Combined mode active — transcription and post-processing run in a single request." />
+          </Typography>
+        </Stack>
       )}
       {!isEnterprise && (
         <ListTile

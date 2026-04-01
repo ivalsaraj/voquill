@@ -1,6 +1,10 @@
 import { getRec } from "@voquill/utilities";
 import { getAppState } from "../store";
 import { TranscriptionSession } from "../types/transcription-session.types";
+import {
+  isCombinedGeminiModeEligible,
+  type CombinedModeInput,
+} from "../utils/combined-mode.utils";
 import { getIsEnterpriseEnabled } from "../utils/enterprise.utils";
 import { getIsEmulators } from "../utils/env.utils";
 import { TranscriptionPrefs } from "../utils/user.utils";
@@ -9,6 +13,7 @@ import { AzureTranscriptionSession } from "./azure-transcription-session";
 import { BatchTranscriptionSession } from "./batch-transcription-session";
 import { DeepgramTranscriptionSession } from "./deepgram-transcription-session";
 import { ElevenLabsTranscriptionSession } from "./elevenlabs-transcription-session";
+import { GeminiCombinedTranscriptionSession } from "./gemini-combined-transcription-session";
 import { LocalTranscriptionSession } from "./local-transcription-session";
 import { NewServerTranscriptionSession } from "./new-server-transcription-session";
 
@@ -17,11 +22,17 @@ export { AzureTranscriptionSession } from "./azure-transcription-session";
 export { BatchTranscriptionSession } from "./batch-transcription-session";
 export { DeepgramTranscriptionSession } from "./deepgram-transcription-session";
 export { ElevenLabsTranscriptionSession } from "./elevenlabs-transcription-session";
+export { GeminiCombinedTranscriptionSession } from "./gemini-combined-transcription-session";
 export { LocalTranscriptionSession } from "./local-transcription-session";
 export { NewServerTranscriptionSession } from "./new-server-transcription-session";
 
+export type CreateTranscriptionSessionOptions = {
+  generativePrefs?: CombinedModeInput["postProcessing"];
+};
+
 export const createTranscriptionSession = (
   prefs: TranscriptionPrefs,
+  options?: CreateTranscriptionSessionOptions,
 ): TranscriptionSession => {
   if (prefs.mode === "api") {
     switch (prefs.provider) {
@@ -36,6 +47,27 @@ export const createTranscriptionSession = (
         const apiKeyRecord = getRec(state.apiKeyById, prefs.apiKeyId);
         const region = apiKeyRecord?.azureRegion || "eastus";
         return new AzureTranscriptionSession(prefs.apiKeyValue, region);
+      }
+      case "gemini": {
+        if (options?.generativePrefs) {
+          const isEligible = isCombinedGeminiModeEligible({
+            transcription: {
+              mode: "api",
+              provider: "gemini",
+              apiKeyId: prefs.apiKeyId,
+              transcriptionModel: prefs.transcriptionModel,
+            },
+            postProcessing: options.generativePrefs,
+          });
+
+          if (isEligible) {
+            return new GeminiCombinedTranscriptionSession(
+              prefs.apiKeyValue,
+              prefs.transcriptionModel,
+            );
+          }
+        }
+        break;
       }
     }
   }

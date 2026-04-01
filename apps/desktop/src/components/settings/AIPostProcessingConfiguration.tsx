@@ -1,4 +1,5 @@
 import { Stack, Typography } from "@mui/material";
+import GraphicEqOutlined from "@mui/icons-material/GraphicEqOutlined";
 import { useCallback } from "react";
 import { FormattedMessage } from "react-intl";
 import {
@@ -31,6 +32,25 @@ export const AIPostProcessingConfiguration = ({
     (state) => state.settings.aiPostProcessing,
   );
   const allowChange = useAppStore(getAllowsChangePostProcessing);
+
+  const showGeminiRecommendation = useAppStore((state) => {
+    if (state.settings.aiPostProcessing.mode !== "api") return false;
+    const selectedKey = state.settings.apiKeys.find(
+      (k) => k.id === state.settings.aiPostProcessing.selectedApiKeyId,
+    );
+    if (selectedKey?.provider !== "gemini") return false;
+
+    const tMode = state.settings.aiTranscription.mode;
+    if (tMode !== "api") return true;
+
+    const tKey = state.settings.apiKeys.find(
+      (k) => k.id === state.settings.aiTranscription.selectedApiKeyId,
+    );
+    if (tKey?.provider === "gemini" && tKey.id === selectedKey.id) {
+      return false;
+    }
+    return true;
+  });
 
   const handleModeChange = useCallback((mode: PostProcessingMode) => {
     void setPreferredPostProcessingMode(mode);
@@ -77,6 +97,27 @@ export const AIPostProcessingConfiguration = ({
           onChange={handleApiKeyChange}
           context="post-processing"
         />
+      )}
+
+      {showGeminiRecommendation && (
+        <Stack
+          direction="row"
+          alignItems="flex-start"
+          spacing={1.5}
+          sx={{
+            p: 1.5,
+            borderRadius: 1,
+            bgcolor: "action.hover",
+          }}
+        >
+          <GraphicEqOutlined
+            fontSize="small"
+            sx={{ color: "info.main", mt: 0.25 }}
+          />
+          <Typography variant="caption" color="text.secondary">
+            <FormattedMessage defaultMessage="This Gemini key supports transcription too. Set transcription to use the same key for combined mode — one request instead of two, with faster results." />
+          </Typography>
+        </Stack>
       )}
 
       {postProcessing.mode === "cloud" && <VoquillCloudSetting />}

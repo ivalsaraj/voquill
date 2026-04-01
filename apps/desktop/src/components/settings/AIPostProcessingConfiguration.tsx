@@ -7,6 +7,7 @@ import {
   setPreferredPostProcessingMode,
 } from "../../actions/user.actions";
 import { useAppStore } from "../../store";
+import { isCombinedGeminiModeEligible } from "../../utils/combined-mode.utils";
 import { getAllowsChangePostProcessing } from "../../utils/enterprise.utils";
 import { ManagedByOrgNotice } from "../common/ManagedByOrgNotice";
 import { type PostProcessingMode } from "../../types/ai.types";
@@ -46,10 +47,23 @@ export const AIPostProcessingConfiguration = ({
     const tKey = state.settings.apiKeys.find(
       (k) => k.id === state.settings.aiTranscription.selectedApiKeyId,
     );
-    if (tKey?.provider === "gemini" && tKey.id === selectedKey.id) {
-      return false;
-    }
-    return true;
+    if (!tKey || tKey.provider !== "gemini") return true;
+
+    const isAlreadyCombined = isCombinedGeminiModeEligible({
+      transcription: {
+        mode: "api",
+        provider: "gemini",
+        apiKeyId: tKey.id,
+        transcriptionModel: tKey.transcriptionModel ?? null,
+      },
+      postProcessing: {
+        mode: "api",
+        provider: "gemini",
+        apiKeyId: selectedKey.id,
+        postProcessingModel: selectedKey.postProcessingModel ?? null,
+      },
+    });
+    return !isAlreadyCombined;
   });
 
   const handleModeChange = useCallback((mode: PostProcessingMode) => {

@@ -76,6 +76,8 @@ export default function SettingsPage() {
   const allowChangeTranscription = useAppStore(getAllowsChangeTranscription);
   const allowChangePostProcessing = useAppStore(getAllowsChangePostProcessing);
   const isCombinedMode = useAppStore((state) => {
+    if (state.enterpriseConfig?.allowPostProcessing === false) return false;
+
     const tPrefs = getTranscriptionPrefs(state);
     const gPrefs = getGenerativePrefs(state);
     return isCombinedGeminiModeEligible({

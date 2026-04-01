@@ -103,6 +103,20 @@ export class GeminiCombinedTranscriptionSession implements TranscriptionSession 
       state,
     });
 
+    // Only run combined (transcribe+process) in dictation mode.
+    // Agent mode only uses rawTranscript — no point processing.
+    // Matches NewServerTranscriptionSession precedent.
+    if (state.activeRecordingMode !== "dictate") {
+      getLogger().info(
+        "Gemini combined: non-dictation mode, transcription only",
+      );
+      return this.transcribeOnly(
+        wavBuffer,
+        transcriptionPrompt,
+        whisperLanguage,
+      );
+    }
+
     const toneId = options?.toneId ?? null;
     const tone = getToneById(state, toneId);
     const shouldSkipPostProcessing =

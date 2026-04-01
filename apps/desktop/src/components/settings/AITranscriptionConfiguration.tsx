@@ -33,6 +33,7 @@ import {
 import { useAppStore } from "../../store";
 import { CPU_DEVICE_VALUE, type TranscriptionMode } from "../../types/ai.types";
 import { getAllowsChangeTranscription } from "../../utils/enterprise.utils";
+import { isCombinedGeminiModeEligible } from "../../utils/combined-mode.utils";
 import { getGenerativePrefs } from "../../utils/user.utils";
 import { formatSize } from "../../utils/format.utils";
 import { type LocalSidecarDownloadSnapshot } from "../../sidecars";
@@ -133,14 +134,24 @@ export const AITranscriptionConfiguration = ({
     if (selectedKey?.provider !== "gemini") return false;
 
     const gPrefs = getGenerativePrefs(state);
-    if (
-      gPrefs.mode === "api" &&
-      gPrefs.provider === "gemini" &&
-      gPrefs.apiKeyId === selectedKey.id
-    ) {
-      return false;
-    }
-    return true;
+    const isAlreadyCombined = isCombinedGeminiModeEligible({
+      transcription: {
+        mode: "api",
+        provider: "gemini",
+        apiKeyId: selectedKey.id,
+        transcriptionModel: selectedKey.transcriptionModel ?? null,
+      },
+      postProcessing:
+        gPrefs.mode === "api"
+          ? {
+              mode: "api",
+              provider: gPrefs.provider,
+              apiKeyId: gPrefs.apiKeyId,
+              postProcessingModel: gPrefs.postProcessingModel,
+            }
+          : { mode: gPrefs.mode },
+    });
+    return !isAlreadyCombined;
   });
   const localTranscriptionConfig = transcription.localModelManagement;
 

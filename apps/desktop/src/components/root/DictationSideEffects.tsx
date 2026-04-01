@@ -78,6 +78,7 @@ import {
 } from "../../utils/tone.utils";
 import {
   getEffectivePillVisibility,
+  getGenerativePrefs,
   getIsDictationUnlocked,
   getMyPreferredMicrophone,
   getMyPrimaryDictationLanguage,
@@ -534,9 +535,21 @@ export const DictationSideEffects = () => {
 
       const preferredMicrophone = getMyPreferredMicrophone(state);
       const transcriptPrefs = getTranscriptionPrefs(state);
+      const genPrefs = getGenerativePrefs(state);
+      const generativePrefsForSession =
+        genPrefs.mode === "api"
+          ? {
+              mode: "api" as const,
+              provider: genPrefs.provider,
+              apiKeyId: genPrefs.apiKeyId,
+              postProcessingModel: genPrefs.postProcessingModel,
+            }
+          : { mode: genPrefs.mode as "cloud" | "none" };
       try {
         getLogger().info(`Transcription prefs: mode=${transcriptPrefs.mode}`);
-        const session = createTranscriptionSession(transcriptPrefs);
+        const session = createTranscriptionSession(transcriptPrefs, {
+          generativePrefs: generativePrefsForSession,
+        });
         getLogger().info(
           `Created transcription session: ${session.constructor.name}`,
         );

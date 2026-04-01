@@ -17,7 +17,6 @@ import {
   normalizeSamples,
 } from "../utils/audio.utils";
 import {
-  coerceToDictationLanguage,
   mapDictationLanguageToWhisperLanguage,
   getDisplayNameForLanguage,
 } from "../utils/language.utils";

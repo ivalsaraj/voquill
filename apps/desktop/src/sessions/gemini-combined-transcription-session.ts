@@ -61,9 +61,7 @@ export const buildCombinedSessionResult = (
   };
 };
 
-export class GeminiCombinedTranscriptionSession
-  implements TranscriptionSession
-{
+export class GeminiCombinedTranscriptionSession implements TranscriptionSession {
   private apiKey: string;
   private model: GeminiTranscriptionModel;
 
@@ -115,7 +113,11 @@ export class GeminiCombinedTranscriptionSession
       getLogger().info(
         "Gemini combined: post-processing disabled, transcription only",
       );
-      return this.transcribeOnly(wavBuffer, transcriptionPrompt, whisperLanguage);
+      return this.transcribeOnly(
+        wavBuffer,
+        transcriptionPrompt,
+        whisperLanguage,
+      );
     }
 
     // Build style prompt for combined mode — NOT using buildPostProcessingPrompt
@@ -174,7 +176,11 @@ export class GeminiCombinedTranscriptionSession
       getLogger().error(
         `Gemini combined: failed, falling back to transcription-only: ${error}`,
       );
-      return this.transcribeOnly(wavBuffer, transcriptionPrompt, whisperLanguage);
+      return this.transcribeOnly(
+        wavBuffer,
+        transcriptionPrompt,
+        whisperLanguage,
+      );
     }
   }
 

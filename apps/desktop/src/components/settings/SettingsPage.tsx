@@ -441,10 +441,7 @@ export default function SettingsPage() {
           spacing={1}
           sx={{ px: 2, py: 1 }}
         >
-          <BoltOutlined
-            fontSize="small"
-            sx={{ color: "success.main" }}
-          />
+          <BoltOutlined fontSize="small" sx={{ color: "success.main" }} />
           <Typography variant="caption" color="text.secondary">
             <FormattedMessage defaultMessage="Combined mode active — transcription and post-processing run in a single request." />
           </Typography>

@@ -21,6 +21,7 @@ export type AzureOpenAIGenerateTextArgs = {
   system?: string;
   prompt: string;
   jsonResponse?: JsonResponse;
+  customFetch?: typeof globalThis.fetch;
 };
 
 export type AzureOpenAIGenerateResponseOutput = {
@@ -28,12 +29,17 @@ export type AzureOpenAIGenerateResponseOutput = {
   tokensUsed: number;
 };
 
-const createClient = (apiKey: string, endpoint: string) => {
+const createClient = (
+  apiKey: string,
+  endpoint: string,
+  customFetch?: typeof globalThis.fetch,
+) => {
   return new AzureOpenAI({
     apiKey: apiKey.trim(),
     endpoint: endpoint.trim(),
     apiVersion: "2024-10-21",
     dangerouslyAllowBrowser: true,
+    fetch: customFetch,
   });
 };
 
@@ -44,11 +50,12 @@ export const azureOpenAIGenerateText = async ({
   system,
   prompt,
   jsonResponse,
+  customFetch,
 }: AzureOpenAIGenerateTextArgs): Promise<AzureOpenAIGenerateResponseOutput> => {
   return retry({
     retries: 3,
     fn: async () => {
-      const client = createClient(apiKey, endpoint);
+      const client = createClient(apiKey, endpoint, customFetch);
 
       const messages: ChatCompletionMessageParam[] = [];
       if (system) {
@@ -86,13 +93,15 @@ export const azureOpenAIGenerateText = async ({
 export type AzureOpenAITestIntegrationArgs = {
   apiKey: string;
   endpoint: string;
+  customFetch?: typeof globalThis.fetch;
 };
 
 export const azureOpenAITestIntegration = async ({
   apiKey,
   endpoint,
+  customFetch,
 }: AzureOpenAITestIntegrationArgs): Promise<boolean> => {
-  const client = createClient(apiKey, endpoint);
+  const client = createClient(apiKey, endpoint, customFetch);
   await client.chat.completions.create({
     messages: [{ role: "user", content: "test" }],
     model: "gpt-4o-mini",
@@ -110,6 +119,7 @@ export type AzureOpenAIStreamChatArgs = {
   endpoint: string;
   deploymentName: string;
   input: LlmChatInput;
+  customFetch?: typeof globalThis.fetch;
 };
 
 export async function* azureOpenaiStreamChat({
@@ -117,7 +127,8 @@ export async function* azureOpenaiStreamChat({
   endpoint,
   deploymentName,
   input,
+  customFetch,
 }: AzureOpenAIStreamChatArgs): AsyncGenerator<LlmStreamEvent> {
-  const client = createClient(apiKey, endpoint);
+  const client = createClient(apiKey, endpoint, customFetch);
   yield* openaiCompatibleStreamChat(client, deploymentName, input);
 }

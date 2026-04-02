@@ -110,6 +110,15 @@ describe("DeepseekGenerateTextRepo", () => {
       expect.objectContaining({ customFetch: mockTauriFetch }),
     );
   });
+
+  it("passes tauriFetch to deepseekStreamChat", async () => {
+    const repo = new DeepseekGenerateTextRepo("test-key", null);
+    const gen = repo.streamChat({ messages: [{ role: "user", content: "hi" }] });
+    for await (const _ of gen) { break; }
+    expect(voiceAi.deepseekStreamChat).toHaveBeenCalledWith(
+      expect.objectContaining({ customFetch: mockTauriFetch }),
+    );
+  });
 });
 
 describe("OpenRouterGenerateTextRepo", () => {
@@ -122,6 +131,15 @@ describe("OpenRouterGenerateTextRepo", () => {
       expect.objectContaining({ customFetch: mockTauriFetch }),
     );
   });
+
+  it("passes tauriFetch to openrouterStreamChat", async () => {
+    const repo = new OpenRouterGenerateTextRepo("test-key", null);
+    const gen = repo.streamChat({ messages: [{ role: "user", content: "hi" }] });
+    for await (const _ of gen) { break; }
+    expect(voiceAi.openrouterStreamChat).toHaveBeenCalledWith(
+      expect.objectContaining({ customFetch: mockTauriFetch }),
+    );
+  });
 });
 
 describe("AzureOpenAIGenerateTextRepo", () => {
@@ -131,6 +149,15 @@ describe("AzureOpenAIGenerateTextRepo", () => {
     const repo = new AzureOpenAIGenerateTextRepo("test-key", "https://example.azure.com", null);
     await repo.generateText({ prompt: "test" });
     expect(voiceAi.azureOpenAIGenerateText).toHaveBeenCalledWith(
+      expect.objectContaining({ customFetch: mockTauriFetch }),
+    );
+  });
+
+  it("passes tauriFetch to azureOpenaiStreamChat", async () => {
+    const repo = new AzureOpenAIGenerateTextRepo("test-key", "https://example.azure.com", null);
+    const gen = repo.streamChat({ messages: [{ role: "user", content: "hi" }] });
+    for await (const _ of gen) { break; }
+    expect(voiceAi.azureOpenaiStreamChat).toHaveBeenCalledWith(
       expect.objectContaining({ customFetch: mockTauriFetch }),
     );
   });

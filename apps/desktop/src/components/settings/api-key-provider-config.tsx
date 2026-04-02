@@ -16,6 +16,7 @@ import {
   openaiTestIntegration,
   openrouterTestIntegration,
 } from "@voquill/voice-ai";
+import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
 import { FormattedMessage } from "react-intl";
 import type { SettingsApiKey } from "../../state/settings.state";
 import {
@@ -84,16 +85,16 @@ const STANDARD_PROVIDERS: Record<
     testFn: (args: { apiKey: string }) => Promise<boolean>;
   }
 > = {
-  groq: { displayName: "Groq", testFn: groqTestIntegration },
-  openai: { displayName: "OpenAI", testFn: openaiTestIntegration },
-  openrouter: { displayName: "OpenRouter", testFn: openrouterTestIntegration },
+  groq: { displayName: "Groq", testFn: (a) => groqTestIntegration({ ...a, customFetch: tauriFetch }) },
+  openai: { displayName: "OpenAI", testFn: (a) => openaiTestIntegration({ ...a, customFetch: tauriFetch }) },
+  openrouter: { displayName: "OpenRouter", testFn: (a) => openrouterTestIntegration({ ...a, customFetch: tauriFetch }) },
   aldea: { displayName: "Aldea", testFn: aldeaTestIntegration },
   assemblyai: { displayName: "AssemblyAI", testFn: assemblyaiTestIntegration },
   deepgram: { displayName: "Deepgram", testFn: deepgramTestIntegration },
   elevenlabs: { displayName: "ElevenLabs", testFn: elevenlabsTestIntegration },
-  deepseek: { displayName: "DeepSeek", testFn: deepseekTestIntegration },
+  deepseek: { displayName: "DeepSeek", testFn: (a) => deepseekTestIntegration({ ...a, customFetch: tauriFetch }) },
   gemini: { displayName: "Gemini", testFn: geminiTestIntegration },
-  claude: { displayName: "Claude", testFn: claudeTestIntegration },
+  claude: { displayName: "Claude", testFn: (a) => claudeTestIntegration({ ...a, customFetch: tauriFetch }) },
   cerebras: { displayName: "Cerebras", testFn: cerebrasTestIntegration },
 };
 
@@ -163,6 +164,7 @@ function getOpenAICompatibleConfig(
       openaiCompatibleTestIntegration({
         baseUrl: apiKey.baseUrl || OPENAI_COMPATIBLE_DEFAULT_URL,
         apiKey: apiKey.keyFull || undefined,
+        customFetch: tauriFetch,
       }),
   };
 }
@@ -221,6 +223,7 @@ const AZURE_OPENAI_CONFIG: ProviderFormConfig = {
     return azureOpenAITestIntegration({
       apiKey: key,
       endpoint: apiKey.baseUrl,
+      customFetch: tauriFetch,
     });
   },
 };

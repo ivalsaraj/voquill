@@ -77,6 +77,7 @@ export type OpenAITranscriptionArgs = {
   ext: string;
   prompt?: string;
   language?: string;
+  customFetch?: typeof globalThis.fetch;
 };
 
 export type OpenAITranscribeAudioOutput = {
@@ -91,11 +92,12 @@ export const openaiTranscribeAudio = async ({
   ext,
   prompt,
   language,
+  customFetch,
 }: OpenAITranscriptionArgs): Promise<OpenAITranscribeAudioOutput> => {
   return retry({
     retries: 3,
     fn: async () => {
-      const client = createClient(apiKey);
+      const client = createClient(apiKey, undefined, customFetch);
 
       const file = await toFile(blob, `audio.${ext}`);
       const response = await client.audio.transcriptions.create({
@@ -201,18 +203,21 @@ export const openaiGenerateTextResponse = async ({
 
 export type OpenAITestIntegrationArgs = {
   apiKey: string;
+  customFetch?: typeof globalThis.fetch;
 };
 
 export type OpenAICompatibleTestIntegrationArgs = {
   baseUrl: string;
   apiKey?: string;
+  customFetch?: typeof globalThis.fetch;
 };
 
 export const openaiCompatibleTestIntegration = async ({
   baseUrl,
   apiKey,
+  customFetch,
 }: OpenAICompatibleTestIntegrationArgs): Promise<boolean> => {
-  const client = createClient(apiKey || "dummy", baseUrl);
+  const client = createClient(apiKey || "dummy", baseUrl, customFetch);
 
   // Test connectivity by listing models
   await client.models.list();
@@ -223,8 +228,9 @@ export const openaiCompatibleTestIntegration = async ({
 
 export const openaiTestIntegration = async ({
   apiKey,
+  customFetch,
 }: OpenAITestIntegrationArgs): Promise<boolean> => {
-  const client = createClient(apiKey);
+  const client = createClient(apiKey, undefined, customFetch);
 
   const response = await client.chat.completions.create({
     messages: [

@@ -45,11 +45,14 @@ const contentToString = (
     .trim();
 };
 
-const createClient = (apiKey: string) => {
+const createClient = (
+  apiKey: string,
+  customFetch?: typeof globalThis.fetch,
+) => {
   // `dangerouslyAllowBrowser` is needed because this runs on a desktop tauri app.
-  // The Tauri app doesn't run in a web browser and encyrpts API keys locally, so this
+  // The Tauri app doesn't run in a web browser and encrypts API keys locally, so this
   // is safe.
-  return new Groq({ apiKey: apiKey.trim(), dangerouslyAllowBrowser: true });
+  return new Groq({ apiKey: apiKey.trim(), dangerouslyAllowBrowser: true, fetch: customFetch });
 };
 
 export type GroqTranscriptionArgs = {
@@ -59,6 +62,7 @@ export type GroqTranscriptionArgs = {
   ext: string;
   prompt?: string;
   language?: string;
+  customFetch?: typeof globalThis.fetch;
 };
 
 export type GroqTranscribeAudioOutput = {
@@ -73,11 +77,12 @@ export const groqTranscribeAudio = async ({
   ext,
   prompt,
   language,
+  customFetch,
 }: GroqTranscriptionArgs): Promise<GroqTranscribeAudioOutput> => {
   return retry({
     retries: 3,
     fn: async () => {
-      const client = createClient(apiKey);
+      const client = createClient(apiKey, customFetch);
 
       const file = await toFile(blob, `audio.${ext}`);
       const response = await client.audio.transcriptions.create({
@@ -103,6 +108,7 @@ export type GroqGenerateTextArgs = {
   prompt: string;
   imageUrls?: string[];
   jsonResponse?: JsonResponse;
+  customFetch?: typeof globalThis.fetch;
 };
 
 export type GroqGenerateResponseOutput = {
@@ -117,11 +123,12 @@ export const groqGenerateTextResponse = async ({
   prompt,
   imageUrls = [],
   jsonResponse,
+  customFetch,
 }: GroqGenerateTextArgs): Promise<GroqGenerateResponseOutput> => {
   return retry({
     retries: 3,
     fn: async () => {
-      const client = createClient(apiKey);
+      const client = createClient(apiKey, customFetch);
 
       const messages: ChatCompletionMessageParam[] = [];
       if (system) {
@@ -176,12 +183,14 @@ export const groqGenerateTextResponse = async ({
 
 export type GroqTestIntegrationArgs = {
   apiKey: string;
+  customFetch?: typeof globalThis.fetch;
 };
 
 export const groqTestIntegration = async ({
   apiKey,
+  customFetch,
 }: GroqTestIntegrationArgs): Promise<boolean> => {
-  const client = createClient(apiKey);
+  const client = createClient(apiKey, customFetch);
 
   const response = await client.chat.completions.create({
     messages: [
@@ -222,17 +231,20 @@ export type GroqStreamChatArgs = {
   apiKey: string;
   model: string;
   input: LlmChatInput;
+  customFetch?: typeof globalThis.fetch;
 };
 
 export async function* groqStreamChat({
   apiKey,
   model,
   input,
+  customFetch,
 }: GroqStreamChatArgs): AsyncGenerator<LlmStreamEvent> {
   const client = new OpenAI({
     apiKey: apiKey.trim(),
     baseURL: "https://api.groq.com/openai/v1",
     dangerouslyAllowBrowser: true,
+    fetch: customFetch,
   });
   yield* openaiCompatibleStreamChat(client, model, input);
 }

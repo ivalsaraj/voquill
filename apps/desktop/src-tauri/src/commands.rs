@@ -1,7 +1,10 @@
 use std::convert::TryInto;
+use std::io::{Read as IoRead, Write as IoWrite};
+use std::net::TcpListener;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
+use keyring::Entry;
 use tauri::{AppHandle, Emitter, EventTarget, Manager, State};
 
 use crate::domain::{
@@ -1697,4 +1700,74 @@ pub fn get_system_volume() -> Result<f64, String> {
 pub fn set_system_volume(volume: f64) -> Result<(), String> {
     let clamped = volume.clamp(0.0, 1.0);
     crate::platform::volume::set_system_volume(clamped)
+}
+
+#[tauri::command]
+pub fn secure_store(key: String, value: String) -> Result<(), String> {
+    Entry::new("voquill", &key)
+        .map_err(|e| e.to_string())?
+        .set_password(&value)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn secure_get(key: String) -> Result<Option<String>, String> {
+    let entry = Entry::new("voquill", &key).map_err(|e| e.to_string())?;
+    match entry.get_password() {
+        Ok(val) => Ok(Some(val)),
+        Err(keyring::Error::NoEntry) => Ok(None),
+        Err(e) => Err(e.to_string()),
+    }
+}
+
+#[tauri::command]
+pub fn secure_delete(key: String) -> Result<(), String> {
+    let entry = Entry::new("voquill", &key).map_err(|e| e.to_string())?;
+    match entry.delete_credential() {
+        Ok(_) => Ok(()),
+        Err(keyring::Error::NoEntry) => Ok(()),
+        Err(e) => Err(e.to_string()),
+    }
+}
+
+#[tauri::command]
+pub async fn oauth_start_callback_server(app: AppHandle) -> Result<u16, String> {
+    let listener = TcpListener::bind("127.0.0.1:0").map_err(|e| e.to_string())?;
+    let port = listener.local_addr().map_err(|e| e.to_string())?.port();
+
+    tokio::task::spawn_blocking(move || {
+        if let Ok((mut stream, _)) = listener.accept() {
+            let mut buf = [0u8; 4096];
+            let request = match stream.read(&mut buf) {
+                Ok(n) => String::from_utf8_lossy(&buf[..n]).to_string(),
+                Err(_) => return,
+            };
+
+            let html = b"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n\
+                <html><body><h2>Voquill: Google Drive connected.</h2>\
+                <p>You can close this tab.</p></body></html>";
+            let _ = stream.write_all(html);
+
+            let extract_param = |query: &str, key: &str| -> Option<String> {
+                query.split('&').find_map(|pair| {
+                    let mut parts = pair.splitn(2, '=');
+                    if parts.next() == Some(key) { parts.next().map(|v| v.to_string()) } else { None }
+                })
+            };
+
+            let query_str = request.lines().next()
+                .and_then(|line| line.split_whitespace().nth(1))
+                .and_then(|path| path.split('?').nth(1))
+                .unwrap_or("");
+
+            let code = extract_param(query_str, "code");
+            let state = extract_param(query_str, "state");
+
+            if let Some(code) = code {
+                let _ = app.emit("google-oauth-code", serde_json::json!({ "code": code, "state": state }));
+            }
+        }
+    });
+
+    Ok(port)
 }

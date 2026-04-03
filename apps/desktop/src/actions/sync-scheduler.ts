@@ -20,6 +20,19 @@ import {
 
 let intervalId: ReturnType<typeof setInterval> | null = null;
 let syncing = false;
+let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+export function triggerEventSync(): void {
+  const prefs = getAppState().userPrefs;
+  if (prefs?.googleDriveSyncMode !== "event" || !prefs?.googleDriveEmail)
+    return;
+
+  if (debounceTimer) clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(() => {
+    debounceTimer = null;
+    syncNow();
+  }, 3000);
+}
 
 export async function syncNow(): Promise<void> {
   if (syncing) return;

@@ -15,6 +15,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useIntl } from "react-intl";
 import { combineLatest, from, Observable, of } from "rxjs";
 import { showErrorSnackbar, showSnackbar } from "../../actions/app.actions";
+import {
+  startSyncScheduler,
+  stopSyncScheduler,
+  syncNow,
+} from "../../actions/sync-scheduler";
 import { loadPairedRemoteDevices } from "../../actions/paired-remote-device.actions";
 import { openUpgradePlanDialog } from "../../actions/pricing.actions";
 import {
@@ -645,6 +650,16 @@ export const AppSideEffects = () => {
     surfaceMainWindow();
     installAvailableUpdate();
   });
+
+  useEffect(() => {
+    if (!initialized) return;
+    const prefs = getMyUserPreferences(getAppState());
+    if (prefs?.googleDriveEmail) {
+      startSyncScheduler();
+      syncNow();
+    }
+    return () => stopSyncScheduler();
+  }, [initialized]);
 
   return null;
 };

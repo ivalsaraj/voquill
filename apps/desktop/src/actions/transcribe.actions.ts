@@ -6,6 +6,7 @@ import {
 } from "@voquill/types";
 import { countWords, dedup } from "@voquill/utilities";
 import dayjs from "dayjs";
+import { triggerEventSync } from "./sync-scheduler";
 import {
   getGenerateTextRepo,
   getTranscribeAudioRepo,
@@ -452,6 +453,8 @@ export const storeTranscription = async (
       ...existingIds,
     ];
   });
+
+  triggerEventSync();
 
   if (wordsAdded > 0) {
     try {

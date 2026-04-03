@@ -13,6 +13,8 @@ export type AppTargetUpsertParams = {
 export abstract class BaseAppTargetRepo extends BaseRepo {
   abstract listAppTargets(): Promise<AppTarget[]>;
   abstract upsertAppTarget(params: AppTargetUpsertParams): Promise<AppTarget>;
+  abstract deleteAppTarget(id: string): Promise<void>;
+  listAppTargetsAll?(): Promise<AppTarget[]>;
 }
 
 export class LocalAppTargetRepo extends BaseAppTargetRepo {
@@ -24,5 +26,13 @@ export class LocalAppTargetRepo extends BaseAppTargetRepo {
     return invoke<AppTarget>("app_target_upsert", {
       args: params,
     });
+  }
+
+  async deleteAppTarget(id: string): Promise<void> {
+    await invoke<void>("app_target_delete", { id });
+  }
+
+  async listAppTargetsAll(): Promise<AppTarget[]> {
+    return invoke<AppTarget[]>("app_target_list_all");
   }
 }

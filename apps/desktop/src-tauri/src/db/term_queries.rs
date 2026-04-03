@@ -20,9 +20,22 @@ pub async fn insert_term(pool: SqlitePool, term: &Term) -> Result<Term, sqlx::Er
     Ok(term.clone())
 }
 
+fn row_to_term(row: &sqlx::sqlite::SqliteRow) -> Term {
+    Term {
+        id: row.get::<String, _>("id"),
+        created_at: row.get::<i64, _>("created_at"),
+        created_by_user_id: row.get::<String, _>("created_by_user_id"),
+        source_value: row.get::<String, _>("source_value"),
+        destination_value: row.get::<String, _>("destination_value"),
+        is_replacement: row.get::<i64, _>("is_replacement") != 0,
+        is_deleted: row.get::<i64, _>("is_deleted") != 0,
+        updated_at: row.get::<Option<String>, _>("updated_at"),
+    }
+}
+
 pub async fn fetch_terms(pool: SqlitePool) -> Result<Vec<Term>, sqlx::Error> {
     let rows = sqlx::query(
-        "SELECT id, created_at, created_by_user_id, source_value, destination_value, is_replacement, is_deleted
+        "SELECT id, created_at, created_by_user_id, source_value, destination_value, is_replacement, is_deleted, updated_at
          FROM terms
          WHERE is_deleted = 0
          ORDER BY created_at DESC",
@@ -30,20 +43,19 @@ pub async fn fetch_terms(pool: SqlitePool) -> Result<Vec<Term>, sqlx::Error> {
     .fetch_all(&pool)
     .await?;
 
-    let terms = rows
-        .into_iter()
-        .map(|row| Term {
-            id: row.get::<String, _>("id"),
-            created_at: row.get::<i64, _>("created_at"),
-            created_by_user_id: row.get::<String, _>("created_by_user_id"),
-            source_value: row.get::<String, _>("source_value"),
-            destination_value: row.get::<String, _>("destination_value"),
-            is_replacement: row.get::<i64, _>("is_replacement") != 0,
-            is_deleted: row.get::<i64, _>("is_deleted") != 0,
-        })
-        .collect();
+    Ok(rows.iter().map(row_to_term).collect())
+}
 
-    Ok(terms)
+pub async fn fetch_terms_all(pool: SqlitePool) -> Result<Vec<Term>, sqlx::Error> {
+    let rows = sqlx::query(
+        "SELECT id, created_at, created_by_user_id, source_value, destination_value, is_replacement, is_deleted, updated_at
+         FROM terms
+         ORDER BY created_at DESC",
+    )
+    .fetch_all(&pool)
+    .await?;
+
+    Ok(rows.iter().map(row_to_term).collect())
 }
 
 pub async fn update_term(pool: SqlitePool, term: &Term) -> Result<Term, sqlx::Error> {
@@ -69,7 +81,7 @@ pub async fn update_term(pool: SqlitePool, term: &Term) -> Result<Term, sqlx::Er
 pub async fn delete_term(pool: SqlitePool, id: &str) -> Result<(), sqlx::Error> {
     sqlx::query(
         "UPDATE terms
-         SET is_deleted = 1
+         SET is_deleted = 1, updated_at = datetime('now')
          WHERE id = ?1",
     )
     .bind(id)

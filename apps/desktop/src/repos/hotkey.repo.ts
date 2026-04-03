@@ -6,6 +6,7 @@ export abstract class BaseHotkeyRepo extends BaseRepo {
   abstract listHotkeys(): Promise<Hotkey[]>;
   abstract saveHotkey(hotkey: Hotkey): Promise<Hotkey>;
   abstract deleteHotkey(id: string): Promise<void>;
+  listHotkeysAll?(): Promise<Hotkey[]>;
 }
 
 export class LocalHotkeyRepo extends BaseHotkeyRepo {
@@ -19,5 +20,9 @@ export class LocalHotkeyRepo extends BaseHotkeyRepo {
 
   async deleteHotkey(id: string): Promise<void> {
     await invoke<void>("hotkey_delete", { id });
+  }
+
+  async listHotkeysAll(): Promise<Hotkey[]> {
+    return invoke<Hotkey[]>("hotkey_list_all");
   }
 }

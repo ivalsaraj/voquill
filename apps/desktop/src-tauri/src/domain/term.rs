@@ -10,4 +10,6 @@ pub struct Term {
     pub destination_value: String,
     pub is_replacement: bool,
     pub is_deleted: bool,
+    #[serde(default)]
+    pub updated_at: Option<String>,
 }

@@ -12,4 +12,8 @@ pub struct AppTarget {
     pub icon_path: Option<String>,
     #[serde(default)]
     pub paste_keybind: Option<String>,
+    #[serde(default)]
+    pub is_deleted: bool,
+    #[serde(default)]
+    pub updated_at: Option<String>,
 }

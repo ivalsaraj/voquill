@@ -15,6 +15,8 @@ function rowToTone(row: ToneRow): Tone {
       systemPromptTemplate: row.system_prompt_template,
     }),
     ...(row.is_template_tone && { isTemplateTone: true }),
+    isDeleted: false,
+    updatedAt: row.created_at.toISOString(),
   };
 }
 

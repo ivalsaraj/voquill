@@ -342,6 +342,25 @@ pub async fn app_target_list(
 }
 
 #[tauri::command]
+pub async fn app_target_list_all(
+    database: State<'_, crate::state::OptionKeyDatabase>,
+) -> Result<Vec<crate::domain::AppTarget>, String> {
+    crate::db::app_target_queries::fetch_app_targets_all(database.pool())
+        .await
+        .map_err(|err| err.to_string())
+}
+
+#[tauri::command]
+pub async fn app_target_delete(
+    id: String,
+    database: State<'_, crate::state::OptionKeyDatabase>,
+) -> Result<(), String> {
+    crate::db::app_target_queries::delete_app_target(database.pool(), &id)
+        .await
+        .map_err(|err| err.to_string())
+}
+
+#[tauri::command]
 pub async fn paired_remote_device_upsert(
     args: PairedRemoteDeviceUpsertArgs,
     database: State<'_, crate::state::OptionKeyDatabase>,
@@ -721,6 +740,15 @@ pub async fn term_list(
 }
 
 #[tauri::command]
+pub async fn term_list_all(
+    database: State<'_, crate::state::OptionKeyDatabase>,
+) -> Result<Vec<crate::domain::Term>, String> {
+    crate::db::term_queries::fetch_terms_all(database.pool())
+        .await
+        .map_err(|err| err.to_string())
+}
+
+#[tauri::command]
 pub async fn term_delete(
     id: String,
     database: State<'_, crate::state::OptionKeyDatabase>,
@@ -745,6 +773,15 @@ pub async fn hotkey_save(
     database: State<'_, crate::state::OptionKeyDatabase>,
 ) -> Result<crate::domain::Hotkey, String> {
     crate::db::hotkey_queries::upsert_hotkey(database.pool(), &hotkey)
+        .await
+        .map_err(|err| err.to_string())
+}
+
+#[tauri::command]
+pub async fn hotkey_list_all(
+    database: State<'_, crate::state::OptionKeyDatabase>,
+) -> Result<Vec<crate::domain::Hotkey>, String> {
+    crate::db::hotkey_queries::fetch_hotkeys_all(database.pool())
         .await
         .map_err(|err| err.to_string())
 }
@@ -950,6 +987,15 @@ pub async fn tone_get(
     database: State<'_, crate::state::OptionKeyDatabase>,
 ) -> Result<Option<crate::domain::Tone>, String> {
     crate::db::tone_queries::fetch_tone_by_id(database.pool(), &id)
+        .await
+        .map_err(|err| err.to_string())
+}
+
+#[tauri::command]
+pub async fn tone_list_all(
+    database: State<'_, crate::state::OptionKeyDatabase>,
+) -> Result<Vec<crate::domain::Tone>, String> {
+    crate::db::tone_queries::fetch_all_tones_including_deleted(database.pool())
         .await
         .map_err(|err| err.to_string())
 }
@@ -1451,6 +1497,15 @@ pub async fn conversation_update(
 }
 
 #[tauri::command]
+pub async fn conversation_list_all(
+    database: State<'_, crate::state::OptionKeyDatabase>,
+) -> Result<Vec<crate::domain::Conversation>, String> {
+    crate::db::conversation_queries::fetch_conversations_all(database.pool())
+        .await
+        .map_err(|err| err.to_string())
+}
+
+#[tauri::command]
 pub async fn conversation_delete(
     id: String,
     database: State<'_, crate::state::OptionKeyDatabase>,
@@ -1491,6 +1546,19 @@ pub async fn chat_message_update(
     crate::db::chat_message_queries::update_chat_message(database.pool(), &message)
         .await
         .map_err(|err| err.to_string())
+}
+
+#[tauri::command]
+pub async fn chat_message_list_all(
+    conversation_id: String,
+    database: State<'_, crate::state::OptionKeyDatabase>,
+) -> Result<Vec<crate::domain::ChatMessage>, String> {
+    crate::db::chat_message_queries::fetch_chat_messages_by_conversation_all(
+        database.pool(),
+        &conversation_id,
+    )
+    .await
+    .map_err(|err| err.to_string())
 }
 
 #[tauri::command]

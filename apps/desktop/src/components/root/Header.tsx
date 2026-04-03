@@ -29,6 +29,7 @@ import {
 import { TrialCountdown } from "../common/TrialCountdown";
 import { maybeArrayElements } from "../settings/AIPostProcessingConfiguration";
 import { GpuMigrationDialog } from "./GpuMigrationDialog";
+import { SyncStatusIndicator } from "../common/SyncStatusIndicator";
 import { SenderReceiverChip } from "./SenderReceiverChip";
 
 export type BaseHeaderProps = {
@@ -133,6 +134,7 @@ export const AppHeader = () => {
             <FormattedMessage defaultMessage="GPU App Deprecation | Upgrade Now" />
           </Button>
         )}
+        <SyncStatusIndicator />
         {plan === "free" && <FreeWordsRemaining />}
         {isOnTrial && <TrialCountdown />}
         <MenuPopoverBuilder

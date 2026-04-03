@@ -127,6 +127,8 @@ pub const GOOGLE_DRIVE_PREFS_MIGRATION_SQL: &str =
     include_str!("migrations/066_google_drive_prefs.sql");
 pub const ENTITY_SYNC_TIMESTAMPS_MIGRATION_SQL: &str =
     include_str!("migrations/067_entity_sync_timestamps.sql");
+pub const ENTITY_TOMBSTONES_MIGRATION_SQL: &str =
+    include_str!("migrations/068_entity_tombstones.sql");
 
 pub fn migrations() -> Vec<tauri_plugin_sql::Migration> {
     vec![
@@ -530,6 +532,12 @@ pub fn migrations() -> Vec<tauri_plugin_sql::Migration> {
             version: 67,
             description: "add_entity_sync_timestamps",
             sql: ENTITY_SYNC_TIMESTAMPS_MIGRATION_SQL,
+            kind: tauri_plugin_sql::MigrationKind::Up,
+        },
+        tauri_plugin_sql::Migration {
+            version: 68,
+            description: "add_entity_tombstones",
+            sql: ENTITY_TOMBSTONES_MIGRATION_SQL,
             kind: tauri_plugin_sql::MigrationKind::Up,
         },
     ]

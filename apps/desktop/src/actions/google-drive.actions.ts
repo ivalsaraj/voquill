@@ -5,6 +5,7 @@ import { GoogleDriveClient } from "../repos/google-drive.client";
 import { produceAppState, getAppState } from "../store";
 import { getUserPreferencesRepo } from "../repos";
 import { showSnackbar, showErrorSnackbar } from "./app.actions";
+import { startSyncScheduler } from "./sync-scheduler";
 
 const CLIENT_ID = import.meta.env.VITE_GOOGLE_OAUTH_CLIENT_ID as string;
 const SCOPE =
@@ -155,7 +156,10 @@ export async function connectGoogleDrive(): Promise<void> {
       });
     }
 
-    showSnackbar(`Google Drive connected as ${email}`, { mode: "success" });
+    showSnackbar(
+      `Google Drive connected as ${email}`,
+      { mode: "success" },
+    );
   } catch (error) {
     produceAppState((draft) => {
       draft.googleDriveSync.status = "error";
@@ -183,7 +187,7 @@ export async function disconnectGoogleDrive(): Promise<void> {
       draft.googleDriveSync.errorMessage = null;
     });
   }
-  showSnackbar("Google Drive disconnected", { mode: "success" });
+  showSnackbar("Google Drive disconnected");
 }
 
 export async function updateSyncMode(
@@ -202,4 +206,5 @@ export async function updateSyncMode(
   produceAppState((draft) => {
     draft.userPrefs = updated;
   });
+  startSyncScheduler();
 }

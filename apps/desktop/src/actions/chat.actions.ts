@@ -6,6 +6,7 @@ import {
   registerChatMessages,
   registerConversations,
 } from "../utils/app.utils";
+import { triggerEventSync } from "./sync-scheduler";
 
 export const loadConversations = async (): Promise<void> => {
   produceAppState((draft) => {
@@ -37,6 +38,7 @@ export const createConversation = async (
     registerConversations(draft, [saved]);
     draft.chat.conversationIds.unshift(saved.id);
   });
+  triggerEventSync();
 
   return saved;
 };
@@ -49,6 +51,7 @@ export const updateConversation = async (
   produceAppState((draft) => {
     registerConversations(draft, [saved]);
   });
+  triggerEventSync();
 
   return saved;
 };
@@ -68,6 +71,7 @@ export const deleteConversation = async (id: string): Promise<void> => {
     }
     delete draft.chatMessageIdsByConversationId[id];
   });
+  triggerEventSync();
 };
 
 export const loadChatMessages = async (
@@ -92,6 +96,7 @@ export const createChatMessage = async (
     ids.push(saved.id);
     draft.chatMessageIdsByConversationId[saved.conversationId] = ids;
   });
+  triggerEventSync();
 
   return saved;
 };
@@ -104,6 +109,7 @@ export const updateChatMessage = async (
   produceAppState((draft) => {
     draft.chatMessageById[saved.id] = saved;
   });
+  triggerEventSync();
 
   return saved;
 };
@@ -124,6 +130,7 @@ export const deleteChatMessages = async (
       (mid) => !idSet.has(mid),
     );
   });
+  triggerEventSync();
 };
 
 export const runAgentForConversation = async (

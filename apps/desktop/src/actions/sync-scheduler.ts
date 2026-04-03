@@ -1,3 +1,4 @@
+import type { Term, Tone, Conversation, ChatMessage, Hotkey, AppTarget, UserPreferences, SyncablePreferences } from "@voquill/types";
 import { getAppState, produceAppState } from "../store";
 import {
   getTermRepo,
@@ -34,6 +35,19 @@ export function triggerEventSync(): void {
   }, 3000);
 }
 
+function stripSensitivePrefs(prefs: UserPreferences): SyncablePreferences & { id: string } {
+  const {
+    transcriptionApiKeyId,
+    postProcessingApiKeyId,
+    agentModeApiKeyId,
+    openclawToken,
+    openclawGatewayUrl,
+    isEnterprise,
+    ...safe
+  } = prefs;
+  return { ...safe, id: prefs.userId };
+}
+
 export async function syncNow(): Promise<void> {
   if (syncing) return;
   syncing = true;
@@ -57,6 +71,14 @@ export async function syncNow(): Promise<void> {
       rootFolderId,
     );
 
+    let transcriptionCache: Awaited<ReturnType<typeof getTranscriptionRepo>["listTranscriptions"]> | null = null;
+    const getTranscriptions = async () => {
+      if (!transcriptionCache) {
+        transcriptionCache = await getTranscriptionRepo().listTranscriptions();
+      }
+      return transcriptionCache;
+    };
+
     const ctx: SyncContext = {
       getLocalEntityRecords: async (name: string) => {
         switch (name) {
@@ -67,13 +89,33 @@ export async function syncNow(): Promise<void> {
           }
           case "tones": {
             const repo = getToneRepo();
-            if (repo.listTonesAll) return (await repo.listTonesAll()) as unknown as SyncRecord[];
-            return (await repo.listTones()) as unknown as SyncRecord[];
+            let tones: Tone[];
+            if (repo.listTonesAll) {
+              tones = await repo.listTonesAll();
+            } else {
+              tones = await repo.listTones();
+            }
+            return tones.filter((t) => !t.isSystem) as unknown as SyncRecord[];
           }
           case "conversations": {
             const repo = getConversationRepo();
             if (repo.listConversationsAll) return (await repo.listConversationsAll()) as unknown as SyncRecord[];
             return (await repo.listConversations()) as unknown as SyncRecord[];
+          }
+          case "chat_messages": {
+            const repo = getConversationRepo();
+            const conversations = repo.listConversationsAll
+              ? await repo.listConversationsAll()
+              : await repo.listConversations();
+            const msgRepo = getChatMessageRepo();
+            const allMessages: ChatMessage[] = [];
+            for (const conv of conversations) {
+              const msgs = msgRepo.listChatMessagesAll
+                ? await msgRepo.listChatMessagesAll(conv.id)
+                : await msgRepo.listChatMessages(conv.id);
+              allMessages.push(...msgs);
+            }
+            return allMessages as unknown as SyncRecord[];
           }
           case "hotkeys": {
             const repo = getHotkeyRepo();
@@ -87,7 +129,7 @@ export async function syncNow(): Promise<void> {
           }
           case "preferences": {
             const prefs = getAppState().userPrefs;
-            return prefs ? [prefs as unknown as SyncRecord] : [];
+            return prefs ? [stripSensitivePrefs(prefs) as unknown as SyncRecord] : [];
           }
           case "user_profile": {
             const user = getAppState().user;
@@ -98,7 +140,7 @@ export async function syncNow(): Promise<void> {
         }
       },
       getLocalTranscriptionIds: async () => {
-        const transcriptions = await getTranscriptionRepo().listTranscriptions();
+        const transcriptions = await getTranscriptions();
         return transcriptions.map((t) => ({
           id: t.id,
           createdAt: t.createdAt,
@@ -107,7 +149,7 @@ export async function syncNow(): Promise<void> {
       getLocalTranscription: async (
         id: string,
       ): Promise<SyncableTranscription | null> => {
-        const transcriptions = await getTranscriptionRepo().listTranscriptions();
+        const transcriptions = await getTranscriptions();
         const t = transcriptions.find((tr) => tr.id === id);
         if (!t) return null;
         return {
@@ -121,8 +163,123 @@ export async function syncNow(): Promise<void> {
           schemaVersion: SCHEMA_VERSION,
         };
       },
-      applyEntityRecords: async () => {},
-      applyTranscription: async () => {},
+      applyEntityRecords: async (entityName: string, records: SyncRecord[]) => {
+        for (const record of records) {
+          try {
+            switch (entityName) {
+              case "terms": {
+                const term = record as unknown as Term;
+                if (term.isDeleted) {
+                  await getTermRepo().deleteTerm(term.id);
+                } else {
+                  await getTermRepo().createTerm(term).catch(() =>
+                    getTermRepo().updateTerm(term),
+                  );
+                }
+                break;
+              }
+              case "tones": {
+                const tone = record as unknown as Tone;
+                if (tone.isDeleted) {
+                  await getToneRepo().deleteTone(tone.id);
+                } else {
+                  await getToneRepo().upsertTone(tone);
+                }
+                break;
+              }
+              case "conversations": {
+                const conv = record as unknown as Conversation;
+                if (conv.isDeleted) {
+                  await getConversationRepo().deleteConversation(conv.id);
+                } else {
+                  await getConversationRepo().createConversation(conv).catch(() =>
+                    getConversationRepo().updateConversation(conv),
+                  );
+                }
+                break;
+              }
+              case "chat_messages": {
+                const msg = record as unknown as ChatMessage;
+                if (msg.isDeleted) {
+                  await getChatMessageRepo().deleteChatMessages([msg.id]);
+                } else {
+                  await getChatMessageRepo().createChatMessage(msg).catch(() =>
+                    getChatMessageRepo().updateChatMessage(msg),
+                  );
+                }
+                break;
+              }
+              case "hotkeys": {
+                const hotkey = record as unknown as Hotkey;
+                if (hotkey.isDeleted) {
+                  await getHotkeyRepo().deleteHotkey(hotkey.id);
+                } else {
+                  await getHotkeyRepo().saveHotkey(hotkey);
+                }
+                break;
+              }
+              case "app_targets": {
+                const target = record as unknown as AppTarget;
+                if (target.isDeleted) {
+                  await getAppTargetRepo().deleteAppTarget(target.id);
+                } else {
+                  await getAppTargetRepo().upsertAppTarget({
+                    id: target.id,
+                    name: target.name,
+                    toneId: target.toneId ?? null,
+                    iconPath: target.iconPath ?? null,
+                    pasteKeybind: target.pasteKeybind ?? null,
+                  });
+                }
+                break;
+              }
+              case "preferences": {
+                const incoming = record as unknown as Record<string, unknown>;
+                const currentPrefs = getAppState().userPrefs;
+                if (currentPrefs) {
+                  const merged = { ...currentPrefs };
+                  for (const [key, value] of Object.entries(incoming)) {
+                    if (
+                      key !== "transcriptionApiKeyId" &&
+                      key !== "postProcessingApiKeyId" &&
+                      key !== "agentModeApiKeyId" &&
+                      key !== "openclawToken" &&
+                      key !== "openclawGatewayUrl" &&
+                      key !== "isEnterprise"
+                    ) {
+                      (merged as Record<string, unknown>)[key] = value;
+                    }
+                  }
+                  await getUserPreferencesRepo().setUserPreferences(
+                    merged as UserPreferences,
+                  );
+                  produceAppState((draft) => {
+                    draft.userPrefs = merged as UserPreferences;
+                  });
+                }
+                break;
+              }
+            }
+          } catch (e) {
+            console.error(`[sync] apply ${entityName}/${record.id} failed:`, e);
+          }
+        }
+      },
+      applyTranscription: async (record: SyncableTranscription) => {
+        try {
+          await getTranscriptionRepo().createTranscription({
+            id: record.id,
+            transcript: record.transcript,
+            rawTranscript: record.rawTranscript ?? "",
+            createdAt: record.createdAt,
+            toneId: record.toneId ?? null,
+            postProcessMode: record.postProcessMode ?? null,
+            warnings: record.warnings ?? [],
+          } as Parameters<typeof getTranscriptionRepo>["0"] extends never ? never : any);
+        } catch {
+          // already exists, skip
+        }
+      },
     };
 
     const result = await runSyncCycle(

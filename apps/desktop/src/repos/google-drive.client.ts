@@ -136,7 +136,7 @@ export class GoogleDriveClient {
       return existingId;
     }
 
-    const boundary = "voquill_boundary";
+    const boundary = `voquill_${crypto.randomUUID().replace(/-/g, "")}`;
     const metadata = JSON.stringify({
       name,
       parents: [parentId],

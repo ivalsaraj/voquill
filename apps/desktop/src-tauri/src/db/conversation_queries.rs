@@ -75,7 +75,7 @@ pub async fn delete_conversation(pool: SqlitePool, id: &str) -> Result<(), sqlx:
         .execute(&pool)
         .await?;
 
-    sqlx::query("UPDATE conversations SET is_deleted = 1, updated_at = strftime('%s','now') * 1000 WHERE id = ?1")
+    sqlx::query("UPDATE conversations SET is_deleted = 1, updated_at = strftime('%s','now','utc') * 1000 WHERE id = ?1")
         .bind(id)
         .execute(&pool)
         .await?;

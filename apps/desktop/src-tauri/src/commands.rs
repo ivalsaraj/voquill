@@ -1735,24 +1735,31 @@ pub async fn oauth_start_callback_server(app: AppHandle) -> Result<u16, String> 
     let listener = TcpListener::bind("127.0.0.1:0").map_err(|e| e.to_string())?;
     let port = listener.local_addr().map_err(|e| e.to_string())?.port();
 
+    listener
+        .set_nonblocking(false)
+        .map_err(|e| e.to_string())?;
+
     tokio::task::spawn_blocking(move || {
-        if let Ok((mut stream, _)) = listener.accept() {
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(300);
+        let _ = listener.set_nonblocking(false);
+
+        let extract_param = |query: &str, key: &str| -> Option<String> {
+            query.split('&').find_map(|pair| {
+                let mut parts = pair.splitn(2, '=');
+                if parts.next() == Some(key) { parts.next().map(|v| v.to_string()) } else { None }
+            })
+        };
+
+        while std::time::Instant::now() < deadline {
+            let (mut stream, _) = match listener.accept() {
+                Ok(conn) => conn,
+                Err(_) => break,
+            };
+
             let mut buf = [0u8; 4096];
             let request = match stream.read(&mut buf) {
                 Ok(n) => String::from_utf8_lossy(&buf[..n]).to_string(),
-                Err(_) => return,
-            };
-
-            let html = b"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n\
-                <html><body><h2>Voquill: Google Drive connected.</h2>\
-                <p>You can close this tab.</p></body></html>";
-            let _ = stream.write_all(html);
-
-            let extract_param = |query: &str, key: &str| -> Option<String> {
-                query.split('&').find_map(|pair| {
-                    let mut parts = pair.splitn(2, '=');
-                    if parts.next() == Some(key) { parts.next().map(|v| v.to_string()) } else { None }
-                })
+                Err(_) => continue,
             };
 
             let query_str = request.lines().next()
@@ -1761,10 +1768,16 @@ pub async fn oauth_start_callback_server(app: AppHandle) -> Result<u16, String> 
                 .unwrap_or("");
 
             let code = extract_param(query_str, "code");
-            let state = extract_param(query_str, "state");
+
+            let html = b"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n\
+                <html><body><h2>Voquill: Google Drive connected.</h2>\
+                <p>You can close this tab.</p></body></html>";
+            let _ = stream.write_all(html);
 
             if let Some(code) = code {
+                let state = extract_param(query_str, "state");
                 let _ = app.emit("google-oauth-code", serde_json::json!({ "code": code, "state": state }));
+                break;
             }
         }
     });

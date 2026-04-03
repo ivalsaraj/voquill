@@ -6,6 +6,7 @@ import { AppTargetUpsertParams } from "../repos/app-target.repo";
 import { getAppState, produceAppState } from "../store";
 import { registerAppTargets } from "../utils/app.utils";
 import { normalizeAppTargetId } from "../utils/apptarget.utils";
+import { triggerEventSync } from "./sync-scheduler";
 import { getEffectiveStylingMode } from "../utils/feature.utils";
 import { getLogger } from "../utils/log.utils";
 import { buildAppIconPath, decodeBase64Icon } from "../utils/storage.utils";
@@ -33,6 +34,7 @@ export const upsertAppTarget = async (
   produceAppState((draft) => {
     registerAppTargets(draft, [target]);
   });
+  triggerEventSync();
 
   return target;
 };

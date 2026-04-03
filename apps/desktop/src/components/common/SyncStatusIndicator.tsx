@@ -1,8 +1,6 @@
 import {
   CloudDoneOutlined,
-  CloudOffOutlined,
   ErrorOutlineOutlined,
-  SyncOutlined,
 } from "@mui/icons-material";
 import { CircularProgress, Tooltip, Typography } from "@mui/material";
 import { FormattedMessage } from "react-intl";

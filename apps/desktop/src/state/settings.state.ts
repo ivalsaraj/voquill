@@ -95,6 +95,7 @@ export type SettingsState = {
   openRouterSearchQuery: string;
   openRouterProviders: OpenRouterProvider[];
   openRouterProvidersStatus: ActionStatus;
+  googleDriveSyncSectionVisible: boolean;
 };
 
 export const createEmptyLocalTranscriptionModelStatusMap =
@@ -172,4 +173,5 @@ export const INITIAL_SETTINGS_STATE: SettingsState = {
   openRouterSearchQuery: "",
   openRouterProviders: [],
   openRouterProvidersStatus: "idle",
+  googleDriveSyncSectionVisible: false,
 };

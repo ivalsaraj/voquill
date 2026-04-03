@@ -5,6 +5,7 @@ export type Conversation = {
   title: string;
   createdAt: string;
   updatedAt: string;
+  isDeleted: boolean;
 };
 
 export type ChatMessageRole = "user" | "assistant" | "system";
@@ -16,4 +17,6 @@ export type ChatMessage = {
   content: string;
   createdAt: string;
   metadata: Nullable<Record<string, unknown>>;
+  isDeleted: boolean;
+  updatedAt: string | null;
 };

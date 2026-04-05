@@ -70,6 +70,8 @@ export const TermDialog = ({
         destinationValue: form.destinationValue,
         isReplacement: form.isReplacement,
         isGlobal: true,
+        isDeleted: existing?.isDeleted ?? false,
+        updatedAt: new Date().toISOString(),
       });
       onClose();
     } finally {

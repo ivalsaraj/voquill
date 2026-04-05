@@ -781,6 +781,7 @@ export const DictationSideEffects = () => {
           }),
           createdAt: now,
           updatedAt: now,
+          isDeleted: false,
         });
         conversationId = conversation.id;
         produceAppState((draft) => {

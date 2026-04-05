@@ -197,6 +197,11 @@ export const submitOnboarding = async () => {
       remoteReceiverAutoStart: false,
       dictationAudioDim: 1.0,
       pasteKeybind: null,
+      googleDriveEmail: null,
+      googleDriveSyncMode: null,
+      googleDriveSyncIntervalMinutes: null,
+      googleDriveLastSyncedAt: null,
+      updatedAt: null,
     };
 
     const [savedUser, savedPreferences] = await Promise.all([

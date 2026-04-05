@@ -58,6 +58,8 @@ export const ToneEditorDialog = () => {
         isSystem: false,
         createdAt: Date.now(),
         sortOrder: nextSortOrder,
+        isDeleted: false,
+        updatedAt: null,
       };
 
       await upsertTone(newTone);

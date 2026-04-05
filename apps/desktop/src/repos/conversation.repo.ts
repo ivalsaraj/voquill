@@ -26,6 +26,7 @@ const toLocalConversation = (
   title: conversation.title,
   createdAt: dayjs(conversation.createdAt).valueOf(),
   updatedAt: dayjs(conversation.updatedAt).valueOf(),
+  isDeleted: conversation.isDeleted,
 });
 
 export abstract class BaseConversationRepo extends BaseRepo {

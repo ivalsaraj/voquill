@@ -38,6 +38,8 @@ Do NOT use em-dash symbols (—) in your response.
       isSystem: true,
       createdAt: 0,
       sortOrder: 0,
+      isDeleted: false,
+      updatedAt: null,
     },
     {
       id: VERBATIM_TONE_ID,
@@ -53,6 +55,8 @@ Do NOT use em-dash symbols (—) in your response.
       isSystem: true,
       createdAt: 0,
       sortOrder: 1,
+      isDeleted: false,
+      updatedAt: null,
     },
     {
       id: EMAIL_TONE_ID,
@@ -89,6 +93,8 @@ Do NOT use em-dash symbols (—) in your response.
       isSystem: true,
       createdAt: 0,
       sortOrder: 2,
+      isDeleted: false,
+      updatedAt: null,
     },
     {
       id: CHAT_TONE_ID,
@@ -114,6 +120,8 @@ Do NOT use em-dash symbols (—) in your response.
       isSystem: true,
       createdAt: 0,
       sortOrder: 3,
+      isDeleted: false,
+      updatedAt: null,
     },
     {
       id: FORMAL_TONE_ID,
@@ -139,6 +147,8 @@ Do NOT use em-dash symbols (—) in your response.
       isSystem: true,
       createdAt: 0,
       sortOrder: 4,
+      isDeleted: false,
+      updatedAt: null,
     },
     ...getDeprecatedSystemTones(),
   ];
@@ -162,6 +172,8 @@ Only apply light edits necessary for clarity and correctness.
       createdAt: 0,
       sortOrder: 0,
       isDeprecated: true,
+      isDeleted: false,
+      updatedAt: null,
     },
     {
       id: "casual",
@@ -176,6 +188,8 @@ Make the language vocal, clean, and free of filler while preserving the speaker'
       createdAt: 0,
       sortOrder: 1,
       isDeprecated: true,
+      isDeleted: false,
+      updatedAt: null,
     },
     {
       id: "formal",
@@ -190,6 +204,8 @@ Make the language vocal, clean, and free of filler while preserving the speaker'
       createdAt: 0,
       sortOrder: 2,
       isDeprecated: true,
+      isDeleted: false,
+      updatedAt: null,
     },
     {
       id: "business",
@@ -204,6 +220,8 @@ Make the language vocal, clean, and free of filler while preserving the speaker'
       createdAt: 0,
       sortOrder: 3,
       isDeprecated: true,
+      isDeleted: false,
+      updatedAt: null,
     },
     {
       id: "punny",
@@ -219,6 +237,8 @@ You must inject clever puns throughout the result.
       createdAt: 0,
       sortOrder: 4,
       isDeprecated: true,
+      isDeleted: false,
+      updatedAt: null,
     },
     {
       id: "disabled",
@@ -231,6 +251,8 @@ You must inject clever puns throughout the result.
       sortOrder: 5,
       shouldDisablePostProcessing: true,
       isDeprecated: true,
+      isDeleted: false,
+      updatedAt: null,
     },
   ];
 };

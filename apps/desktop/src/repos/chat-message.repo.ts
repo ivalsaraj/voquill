@@ -32,6 +32,8 @@ const toLocalChatMessage = (message: ChatMessage): LocalChatMessage => ({
   content: message.content,
   createdAt: dayjs(message.createdAt).valueOf(),
   metadata: message.metadata ? JSON.stringify(message.metadata) : null,
+  isDeleted: message.isDeleted,
+  updatedAt: message.updatedAt,
 });
 
 export abstract class BaseChatMessageRepo extends BaseRepo {

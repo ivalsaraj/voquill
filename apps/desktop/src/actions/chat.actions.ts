@@ -156,6 +156,8 @@ export const sendChatMessage = async (
     content: text,
     createdAt: new Date().toISOString(),
     metadata: null,
+    isDeleted: false,
+    updatedAt: null,
   });
 
   await runAgentForConversation(conversationId);

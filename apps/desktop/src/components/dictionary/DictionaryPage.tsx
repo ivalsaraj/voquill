@@ -35,6 +35,8 @@ export default function DictionaryPage() {
         sourceValue,
         destinationValue,
         isReplacement: replacement,
+        isDeleted: false,
+        updatedAt: null,
       };
 
       produceAppState((draft) => {

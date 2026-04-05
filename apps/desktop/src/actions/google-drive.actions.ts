@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { open } from "@tauri-apps/plugin-opener";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { GoogleDriveClient } from "../repos/google-drive.client";
 import { produceAppState, getAppState } from "../store";
 import { getUserPreferencesRepo } from "../repos";
@@ -94,7 +94,7 @@ export async function connectGoogleDrive(): Promise<void> {
     authUrl.searchParams.set("prompt", "consent");
     authUrl.searchParams.set("state", csrfState);
 
-    await open(authUrl.toString());
+    await openUrl(authUrl.toString());
 
     const code = await new Promise<string>((resolve, reject) => {
       const timeout = setTimeout(

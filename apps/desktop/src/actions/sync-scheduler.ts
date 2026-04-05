@@ -71,7 +71,7 @@ export async function syncNow(): Promise<void> {
       rootFolderId,
     );
 
-    let transcriptionCache: Awaited<ReturnType<typeof getTranscriptionRepo>["listTranscriptions"]> | null = null;
+    let transcriptionCache: Awaited<ReturnType<ReturnType<typeof getTranscriptionRepo>["listTranscriptions"]>> | null = null;
     const getTranscriptions = async () => {
       if (!transcriptionCache) {
         transcriptionCache = await getTranscriptionRepo().listTranscriptions();
@@ -132,8 +132,7 @@ export async function syncNow(): Promise<void> {
             return prefs ? [stripSensitivePrefs(prefs) as unknown as SyncRecord] : [];
           }
           case "user_profile": {
-            const user = getAppState().user;
-            return user ? [user as unknown as SyncRecord] : [];
+            return [];
           }
           default:
             return [];
@@ -275,7 +274,7 @@ export async function syncNow(): Promise<void> {
             toneId: record.toneId ?? null,
             postProcessMode: record.postProcessMode ?? null,
             warnings: record.warnings ?? [],
-          } as Parameters<typeof getTranscriptionRepo>["0"] extends never ? never : any);
+          } as Parameters<ReturnType<typeof getTranscriptionRepo>["createTranscription"]>[0]);
         } catch {
           // already exists, skip
         }

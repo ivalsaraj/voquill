@@ -90,6 +90,8 @@ export const KeybindingsForm = () => {
       id: primaryHotkey?.id ?? createId(),
       actionName: DICTATE_HOTKEY,
       keys,
+      isDeleted: false,
+      updatedAt: null,
     };
 
     try {

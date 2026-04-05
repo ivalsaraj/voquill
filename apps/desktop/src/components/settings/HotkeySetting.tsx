@@ -84,6 +84,8 @@ export const HotkeySetting = ({
       id: id ?? createId(),
       actionName,
       keys: keys ?? [],
+      isDeleted: false,
+      updatedAt: null,
     };
 
     try {

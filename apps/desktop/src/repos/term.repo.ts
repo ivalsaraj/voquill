@@ -23,7 +23,8 @@ const toLocalTerm = (term: Term): LocalTerm => ({
   sourceValue: term.sourceValue,
   destinationValue: term.destinationValue,
   isReplacement: term.isReplacement,
-  isDeleted: false,
+  isDeleted: term.isDeleted,
+  updatedAt: term.updatedAt,
 });
 
 const fromLocalTerm = (term: LocalTerm): Term => ({

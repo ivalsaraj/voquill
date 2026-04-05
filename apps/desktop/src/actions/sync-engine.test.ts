@@ -52,7 +52,7 @@ describe("mergeByUpdatedAt", () => {
     const remote: SyncRecord[] = [{ id: "1", value: "remote" }];
     const result = mergeByUpdatedAt(local, remote);
     expect(result).toHaveLength(1);
-    expect((result[0] as { value: string }).value).toBe("local");
+    expect((result[0] as unknown as { value: string }).value).toBe("local");
   });
 
   it("prefers newer record when both have updatedAt", () => {
@@ -64,7 +64,7 @@ describe("mergeByUpdatedAt", () => {
     ];
     const result = mergeByUpdatedAt(local, remote);
     expect(result).toHaveLength(1);
-    expect((result[0] as { value: string }).value).toBe("new");
+    expect((result[0] as unknown as { value: string }).value).toBe("new");
   });
 
   it("includes tombstone records (isDeleted: true) from remote side", () => {
@@ -74,7 +74,7 @@ describe("mergeByUpdatedAt", () => {
     ];
     const result = mergeByUpdatedAt(local, remote);
     expect(result).toHaveLength(1);
-    expect((result[0] as { isDeleted: boolean }).isDeleted).toBe(true);
+    expect((result[0] as unknown as { isDeleted: boolean }).isDeleted).toBe(true);
   });
 
   it("preserves local live record when local updatedAt is newer than remote tombstone", () => {
@@ -86,7 +86,7 @@ describe("mergeByUpdatedAt", () => {
     ];
     const result = mergeByUpdatedAt(local, remote);
     expect(result).toHaveLength(1);
-    expect((result[0] as { value: string }).value).toBe("alive");
+    expect((result[0] as unknown as { value: string }).value).toBe("alive");
   });
 
   it("merges non-overlapping records from both sides", () => {

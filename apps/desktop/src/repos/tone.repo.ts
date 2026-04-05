@@ -35,6 +35,8 @@ const toLocalTone = (tone: Tone): LocalTone => ({
   promptTemplate: tone.promptTemplate,
   createdAt: tone.createdAt,
   sortOrder: tone.sortOrder,
+  isDeleted: tone.isDeleted,
+  updatedAt: tone.updatedAt,
 });
 
 const getSystemToneById = (id: string): Tone | undefined =>

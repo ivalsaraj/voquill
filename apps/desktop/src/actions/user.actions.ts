@@ -114,6 +114,11 @@ export const createDefaultPreferences = (): UserPreferences => ({
   remoteReceiverAutoStart: false,
   dictationAudioDim: 1.0,
   pasteKeybind: null,
+  googleDriveEmail: null,
+  googleDriveSyncMode: null,
+  googleDriveSyncIntervalMinutes: null,
+  googleDriveLastSyncedAt: null,
+  updatedAt: null,
 });
 
 export const updateUserPreferences = async (

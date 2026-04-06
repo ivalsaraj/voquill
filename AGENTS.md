@@ -48,3 +48,62 @@
 - Scripts: `pnpm run build`.
 
 ** Important scripts **
+
+---
+
+## UPSTREAM SYNC — MANDATORY PROTOCOL
+
+This is a **fork** of `https://github.com/voquill/voquill`. We maintain custom additions on top. Every upstream pull is a risk to our custom code.
+
+### Before ANY upstream merge or rebase:
+
+1. `git fetch upstream`
+2. Run `git diff main upstream/main -- <file>` on every file in the **Protected Files** list below
+3. For each conflict or divergence: **stop and report to the user** with a plain-language summary of what upstream changed vs what we added. Do NOT auto-resolve.
+4. Get explicit approval on each conflict before proceeding.
+5. After merge: run `pnpm run build` and confirm it passes before committing.
+
+### Never silently:
+- Accept an upstream change that touches a Protected File
+- Let upstream overwrite our custom additions
+- Auto-resolve merge conflicts in Protected Files
+
+---
+
+## OUR CUSTOM ADDITIONS (vs upstream)
+
+### 1. Remote Desktop — Command-V paste fix
+**Files:** `apps/desktop/src-tauri/src/platform/macos/input.rs`
+**What:** `simulate_cmd_v()` sends explicit `KEY_COMMAND` key-down and key-up events wrapping the V keypress, instead of just setting `CGEventFlagCommand` on the V event alone.
+**Why:** Remote desktop clients (macOS Screen Sharing etc.) track physical modifier key state in the HID stream. The flag-only approach causes them to strip the modifier and type a bare `v`. Upstream reverted this fix in their tree — we must re-apply it after every upstream merge.
+**Rule:** After any upstream merge that touches `input.rs`, verify `simulate_cmd_v` still sends the full `KEY_COMMAND` down → V down → V up → `KEY_COMMAND` up sequence.
+
+### 2. Google Drive Sync
+**Branch:** `feat/google-drive-sync`
+**Files:** `apps/desktop/src/actions/google-drive.actions.ts`, `sync-scheduler.ts`, `sync-engine.ts`, `sync-engine.test.ts`, `apps/desktop/src/repos/preferences.repo.ts`, `packages/types/src/preferences.types.ts`
+**What:** Full Google Drive OAuth + bidirectional sync for terms, tones, conversations, messages, hotkeys, transcriptions, and preferences.
+**Why:** User-requested feature not in upstream.
+**Rule:** When rebasing this branch onto an updated `main`, check all repo/type files for new fields added by both sides.
+
+### 3. Type field propagation fixes
+**What:** `isDeleted` and `updatedAt` fields added to `ChatMessage`, `Conversation`, `Hotkey`, `Term`, `Tone`, `UserPreferences` — propagated through all construction sites, repo mappers, and call sites.
+**Why:** Upstream added these fields to types but left callers incomplete; we fixed all 45 TS errors.
+**Rule:** After an upstream merge, run `pnpm run build` immediately — new upstream type changes may re-introduce similar mismatches.
+
+### 4. `.gitignore` — `docs/superpowers/`
+**What:** `docs/superpowers/` is ignored locally (AI planning docs, not for the repo).
+**Rule:** If upstream modifies `.gitignore`, ensure this line is preserved.
+
+---
+
+## PROTECTED FILES (check diff before every upstream merge)
+
+```
+apps/desktop/src-tauri/src/platform/macos/input.rs   ← simulate_cmd_v fix
+apps/desktop/src/actions/google-drive.actions.ts      ← custom feature
+apps/desktop/src/actions/sync-scheduler.ts            ← custom feature
+apps/desktop/src/actions/sync-engine.ts               ← custom feature
+apps/desktop/src/repos/preferences.repo.ts            ← Google Drive fields
+packages/types/src/preferences.types.ts              ← Google Drive fields
+.gitignore                                             ← docs/superpowers/ line
+```

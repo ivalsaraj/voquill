@@ -14,6 +14,8 @@ type LocalTone = {
   promptTemplate: string;
   createdAt: number;
   sortOrder: number;
+  isDeleted: boolean;
+  updatedAt: string | null;
 };
 
 const fromLocalTone = (tone: LocalTone): Tone => ({
@@ -23,6 +25,8 @@ const fromLocalTone = (tone: LocalTone): Tone => ({
   isSystem: false,
   createdAt: tone.createdAt,
   sortOrder: tone.sortOrder,
+  isDeleted: tone.isDeleted,
+  updatedAt: tone.updatedAt,
 });
 
 const toLocalTone = (tone: Tone): LocalTone => ({
@@ -31,6 +35,8 @@ const toLocalTone = (tone: Tone): LocalTone => ({
   promptTemplate: tone.promptTemplate,
   createdAt: tone.createdAt,
   sortOrder: tone.sortOrder,
+  isDeleted: tone.isDeleted,
+  updatedAt: tone.updatedAt,
 });
 
 const getSystemToneById = (id: string): Tone | undefined =>
@@ -47,6 +53,7 @@ export abstract class BaseToneRepo extends BaseRepo {
   protected abstract getToneInternal(id: string): Promise<Tone | null>;
   protected abstract upsertToneInternal(tone: Tone): Promise<Tone>;
   protected abstract deleteToneInternal(id: string): Promise<void>;
+  listTonesAll?(): Promise<Tone[]>;
 
   async listTones(): Promise<Tone[]> {
     const userTones = await this.listTonesInternal().catch((error) => {
@@ -121,6 +128,11 @@ export class LocalToneRepo extends BaseToneRepo {
 
   protected async deleteToneInternal(id: string): Promise<void> {
     await invoke("tone_delete", { id });
+  }
+
+  async listTonesAll(): Promise<Tone[]> {
+    const tones = await invoke<LocalTone[]>("tone_list_all");
+    return tones.map(fromLocalTone);
   }
 }
 

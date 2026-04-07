@@ -15,6 +15,8 @@ export type DatabaseTone = {
   shouldDisablePostProcessing?: boolean;
   systemPromptTemplate?: string;
   isTemplateTone?: boolean;
+  isDeleted: boolean;
+  updatedAt: string | null;
 };
 
 export type Tone = Replace<DatabaseTone, FiremixTimestamp, number>;
@@ -39,5 +41,7 @@ export const ToneZod = z
     shouldDisablePostProcessing: z.boolean().optional(),
     systemPromptTemplate: z.string().optional(),
     isTemplateTone: z.boolean().optional(),
+    isDeleted: z.boolean(),
+    updatedAt: z.string().nullable(),
   })
   .strict() satisfies z.ZodType<Tone>;

@@ -37,7 +37,26 @@ export type UserPreferences = {
   remoteReceiverAutoStart: boolean;
   dictationAudioDim: number;
   pasteKeybind: Nullable<string>;
+  googleDriveEmail: Nullable<string>;
+  googleDriveSyncMode: Nullable<'event' | 'interval' | 'manual'>;
+  googleDriveSyncIntervalMinutes: Nullable<number>;
+  googleDriveLastSyncedAt: Nullable<string>;
+  updatedAt: Nullable<string>;
 
   // deprecated
   isEnterprise: boolean;
 };
+
+/**
+ * Subset of UserPreferences that is safe to write to Google Drive.
+ * API key IDs and sensitive tokens are intentionally excluded.
+ */
+export type SyncablePreferences = Omit<
+  UserPreferences,
+  | 'transcriptionApiKeyId'
+  | 'postProcessingApiKeyId'
+  | 'agentModeApiKeyId'
+  | 'openclawToken'
+  | 'openclawGatewayUrl'
+  | 'isEnterprise'
+>;

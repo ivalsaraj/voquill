@@ -1,7 +1,10 @@
 use std::convert::TryInto;
+use std::io::{Read as IoRead, Write as IoWrite};
+use std::net::TcpListener;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
+use keyring::Entry;
 use tauri::{AppHandle, Emitter, EventTarget, Manager, State};
 
 use crate::domain::{
@@ -337,6 +340,25 @@ pub async fn app_target_list(
     database: State<'_, crate::state::OptionKeyDatabase>,
 ) -> Result<Vec<crate::domain::AppTarget>, String> {
     crate::db::app_target_queries::fetch_app_targets(database.pool())
+        .await
+        .map_err(|err| err.to_string())
+}
+
+#[tauri::command]
+pub async fn app_target_list_all(
+    database: State<'_, crate::state::OptionKeyDatabase>,
+) -> Result<Vec<crate::domain::AppTarget>, String> {
+    crate::db::app_target_queries::fetch_app_targets_all(database.pool())
+        .await
+        .map_err(|err| err.to_string())
+}
+
+#[tauri::command]
+pub async fn app_target_delete(
+    id: String,
+    database: State<'_, crate::state::OptionKeyDatabase>,
+) -> Result<(), String> {
+    crate::db::app_target_queries::delete_app_target(database.pool(), &id)
         .await
         .map_err(|err| err.to_string())
 }
@@ -721,6 +743,15 @@ pub async fn term_list(
 }
 
 #[tauri::command]
+pub async fn term_list_all(
+    database: State<'_, crate::state::OptionKeyDatabase>,
+) -> Result<Vec<crate::domain::Term>, String> {
+    crate::db::term_queries::fetch_terms_all(database.pool())
+        .await
+        .map_err(|err| err.to_string())
+}
+
+#[tauri::command]
 pub async fn term_delete(
     id: String,
     database: State<'_, crate::state::OptionKeyDatabase>,
@@ -745,6 +776,15 @@ pub async fn hotkey_save(
     database: State<'_, crate::state::OptionKeyDatabase>,
 ) -> Result<crate::domain::Hotkey, String> {
     crate::db::hotkey_queries::upsert_hotkey(database.pool(), &hotkey)
+        .await
+        .map_err(|err| err.to_string())
+}
+
+#[tauri::command]
+pub async fn hotkey_list_all(
+    database: State<'_, crate::state::OptionKeyDatabase>,
+) -> Result<Vec<crate::domain::Hotkey>, String> {
+    crate::db::hotkey_queries::fetch_hotkeys_all(database.pool())
         .await
         .map_err(|err| err.to_string())
 }
@@ -950,6 +990,15 @@ pub async fn tone_get(
     database: State<'_, crate::state::OptionKeyDatabase>,
 ) -> Result<Option<crate::domain::Tone>, String> {
     crate::db::tone_queries::fetch_tone_by_id(database.pool(), &id)
+        .await
+        .map_err(|err| err.to_string())
+}
+
+#[tauri::command]
+pub async fn tone_list_all(
+    database: State<'_, crate::state::OptionKeyDatabase>,
+) -> Result<Vec<crate::domain::Tone>, String> {
+    crate::db::tone_queries::fetch_all_tones_including_deleted(database.pool())
         .await
         .map_err(|err| err.to_string())
 }
@@ -1451,6 +1500,15 @@ pub async fn conversation_update(
 }
 
 #[tauri::command]
+pub async fn conversation_list_all(
+    database: State<'_, crate::state::OptionKeyDatabase>,
+) -> Result<Vec<crate::domain::Conversation>, String> {
+    crate::db::conversation_queries::fetch_conversations_all(database.pool())
+        .await
+        .map_err(|err| err.to_string())
+}
+
+#[tauri::command]
 pub async fn conversation_delete(
     id: String,
     database: State<'_, crate::state::OptionKeyDatabase>,
@@ -1491,6 +1549,19 @@ pub async fn chat_message_update(
     crate::db::chat_message_queries::update_chat_message(database.pool(), &message)
         .await
         .map_err(|err| err.to_string())
+}
+
+#[tauri::command]
+pub async fn chat_message_list_all(
+    conversation_id: String,
+    database: State<'_, crate::state::OptionKeyDatabase>,
+) -> Result<Vec<crate::domain::ChatMessage>, String> {
+    crate::db::chat_message_queries::fetch_chat_messages_by_conversation_all(
+        database.pool(),
+        &conversation_id,
+    )
+    .await
+    .map_err(|err| err.to_string())
 }
 
 #[tauri::command]
@@ -1629,4 +1700,87 @@ pub fn get_system_volume() -> Result<f64, String> {
 pub fn set_system_volume(volume: f64) -> Result<(), String> {
     let clamped = volume.clamp(0.0, 1.0);
     crate::platform::volume::set_system_volume(clamped)
+}
+
+#[tauri::command]
+pub fn secure_store(key: String, value: String) -> Result<(), String> {
+    Entry::new("voquill", &key)
+        .map_err(|e| e.to_string())?
+        .set_password(&value)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn secure_get(key: String) -> Result<Option<String>, String> {
+    let entry = Entry::new("voquill", &key).map_err(|e| e.to_string())?;
+    match entry.get_password() {
+        Ok(val) => Ok(Some(val)),
+        Err(keyring::Error::NoEntry) => Ok(None),
+        Err(e) => Err(e.to_string()),
+    }
+}
+
+#[tauri::command]
+pub fn secure_delete(key: String) -> Result<(), String> {
+    let entry = Entry::new("voquill", &key).map_err(|e| e.to_string())?;
+    match entry.delete_credential() {
+        Ok(_) => Ok(()),
+        Err(keyring::Error::NoEntry) => Ok(()),
+        Err(e) => Err(e.to_string()),
+    }
+}
+
+#[tauri::command]
+pub async fn oauth_start_callback_server(app: AppHandle) -> Result<u16, String> {
+    let listener = TcpListener::bind("127.0.0.1:0").map_err(|e| e.to_string())?;
+    let port = listener.local_addr().map_err(|e| e.to_string())?.port();
+
+    listener
+        .set_nonblocking(false)
+        .map_err(|e| e.to_string())?;
+
+    tokio::task::spawn_blocking(move || {
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(300);
+        let _ = listener.set_nonblocking(false);
+
+        let extract_param = |query: &str, key: &str| -> Option<String> {
+            query.split('&').find_map(|pair| {
+                let mut parts = pair.splitn(2, '=');
+                if parts.next() == Some(key) { parts.next().map(|v| v.to_string()) } else { None }
+            })
+        };
+
+        while std::time::Instant::now() < deadline {
+            let (mut stream, _) = match listener.accept() {
+                Ok(conn) => conn,
+                Err(_) => break,
+            };
+
+            let mut buf = [0u8; 4096];
+            let request = match stream.read(&mut buf) {
+                Ok(n) => String::from_utf8_lossy(&buf[..n]).to_string(),
+                Err(_) => continue,
+            };
+
+            let query_str = request.lines().next()
+                .and_then(|line| line.split_whitespace().nth(1))
+                .and_then(|path| path.split('?').nth(1))
+                .unwrap_or("");
+
+            let code = extract_param(query_str, "code");
+
+            let html = b"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n\
+                <html><body><h2>Voquill: Google Drive connected.</h2>\
+                <p>You can close this tab.</p></body></html>";
+            let _ = stream.write_all(html);
+
+            if let Some(code) = code {
+                let state = extract_param(query_str, "state");
+                let _ = app.emit("google-oauth-code", serde_json::json!({ "code": code, "state": state }));
+                break;
+            }
+        }
+    });
+
+    Ok(port)
 }

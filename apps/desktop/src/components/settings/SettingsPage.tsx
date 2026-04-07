@@ -65,6 +65,7 @@ import {
 import { ListTile } from "../common/ListTile";
 import { Section } from "../common/Section";
 import { DashboardEntryLayout } from "../dashboard/DashboardEntryLayout";
+import { GoogleDriveSyncSection } from "./GoogleDriveSyncSection";
 
 export default function SettingsPage() {
   const hasEmailProvider = useAppStore(getHasEmailProvider);
@@ -500,6 +501,7 @@ export default function SettingsPage() {
         </Typography>
         {general}
         {processing}
+        {!isEnterprise && <GoogleDriveSyncSection />}
         {advanced}
         {!isEnterprise && dangerZone}
       </Stack>

@@ -65,6 +65,11 @@ export type StreamingMessageState = {
   isStreaming: boolean;
 };
 
+export type GoogleDriveSyncState = {
+  status: 'idle' | 'syncing' | 'error';
+  errorMessage: Nullable<string>;
+};
+
 export type RecordingMode = "dictate" | "agent";
 
 export type AssistantInputMode = "voice" | "type";
@@ -109,6 +114,7 @@ export type AppState = {
   isEnterprise: boolean;
   oidcProviders: OidcProvider[];
 
+  googleDriveSync: GoogleDriveSyncState;
   local: LocalState;
   onboarding: OnboardingState;
   transcriptions: TranscriptionsState;
@@ -187,6 +193,7 @@ export const INITIAL_APP_STATE: AppState = {
   supportsPasteKeybinds: "disabled",
   pillConversationId: null,
   assistantInputMode: "voice",
+  googleDriveSync: { status: 'idle', errorMessage: null },
   local: INITIAL_LOCAL_STATE,
   chat: INITIAL_CHAT_STATE,
   onboarding: INITIAL_ONBOARDING_STATE,

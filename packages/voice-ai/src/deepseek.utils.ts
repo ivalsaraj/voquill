@@ -34,11 +34,12 @@ const contentToString = (
     .trim();
 };
 
-const createClient = (apiKey: string) => {
+const createClient = (apiKey: string, customFetch?: typeof globalThis.fetch) => {
   return new OpenAI({
     apiKey: apiKey.trim(),
     baseURL: DEEPSEEK_BASE_URL,
     dangerouslyAllowBrowser: true, // This is safe because Voquill natively on desktop
+    fetch: customFetch,
   });
 };
 
@@ -48,6 +49,7 @@ export type DeepseekGenerateTextArgs = {
   system?: string;
   prompt: string;
   jsonResponse?: JsonResponse;
+  customFetch?: typeof globalThis.fetch;
 };
 
 export type DeepseekGenerateResponseOutput = {
@@ -61,11 +63,12 @@ export const deepseekGenerateTextResponse = async ({
   system,
   prompt,
   jsonResponse,
+  customFetch,
 }: DeepseekGenerateTextArgs): Promise<DeepseekGenerateResponseOutput> => {
   return retry({
     retries: 3,
     fn: async () => {
-      const client = createClient(apiKey);
+      const client = createClient(apiKey, customFetch);
 
       const messages: ChatCompletionMessageParam[] = [];
       if (system) {
@@ -111,12 +114,14 @@ export const deepseekGenerateTextResponse = async ({
 
 export type DeepseekTestIntegrationArgs = {
   apiKey: string;
+  customFetch?: typeof globalThis.fetch;
 };
 
 export const deepseekTestIntegration = async ({
   apiKey,
+  customFetch,
 }: DeepseekTestIntegrationArgs): Promise<boolean> => {
-  const client = createClient(apiKey);
+  const client = createClient(apiKey, customFetch);
 
   const response = await client.chat.completions.create({
     messages: [
@@ -157,13 +162,15 @@ export type DeepseekStreamChatArgs = {
   apiKey: string;
   model: string;
   input: LlmChatInput;
+  customFetch?: typeof globalThis.fetch;
 };
 
 export async function* deepseekStreamChat({
   apiKey,
   model,
   input,
+  customFetch,
 }: DeepseekStreamChatArgs): AsyncGenerator<LlmStreamEvent> {
-  const client = createClient(apiKey);
+  const client = createClient(apiKey, customFetch);
   yield* openaiCompatibleStreamChat(client, model, input);
 }

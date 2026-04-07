@@ -65,6 +65,7 @@ export class AgentStrategy extends BaseStrategy {
         }),
         createdAt: now,
         updatedAt: now,
+        isDeleted: false,
       });
       this.conversationId = conversation.id;
       produceAppState((draft) => {

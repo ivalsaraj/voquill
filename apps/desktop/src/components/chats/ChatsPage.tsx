@@ -46,6 +46,7 @@ export default function ChatsPage() {
       title: intl.formatMessage({ defaultMessage: "New conversation" }),
       createdAt: now,
       updatedAt: now,
+      isDeleted: false,
     });
     setSearchParams({ id: saved.id }, { replace: true });
   };

@@ -112,6 +112,7 @@ export class GroqGenerateTextRepo extends BaseGenerateTextRepo {
       prompt: input.prompt,
       system: input.system ?? undefined,
       jsonResponse: input.jsonResponse,
+      customFetch: tauriFetch,
     });
 
     return {
@@ -128,6 +129,7 @@ export class GroqGenerateTextRepo extends BaseGenerateTextRepo {
       apiKey: this.groqApiKey,
       model: this.model,
       input,
+      customFetch: tauriFetch,
     });
   }
 }
@@ -149,6 +151,7 @@ export class OpenAIGenerateTextRepo extends BaseGenerateTextRepo {
       prompt: input.prompt,
       system: input.system ?? undefined,
       jsonResponse: input.jsonResponse,
+      customFetch: tauriFetch,
     });
 
     return {
@@ -165,6 +168,7 @@ export class OpenAIGenerateTextRepo extends BaseGenerateTextRepo {
       apiKey: this.openaiApiKey,
       model: this.model,
       input,
+      customFetch: tauriFetch,
     });
   }
 }
@@ -279,6 +283,7 @@ export class OpenRouterGenerateTextRepo extends BaseGenerateTextRepo {
       system: input.system ?? undefined,
       jsonResponse: input.jsonResponse,
       providerRouting: this.providerRouting,
+      customFetch: tauriFetch,
     });
 
     return {
@@ -295,6 +300,7 @@ export class OpenRouterGenerateTextRepo extends BaseGenerateTextRepo {
       apiKey: this.apiKey,
       model: this.model,
       input,
+      customFetch: tauriFetch,
     });
   }
 }
@@ -319,6 +325,7 @@ export class AzureOpenAIGenerateTextRepo extends BaseGenerateTextRepo {
       system: input.system ?? undefined,
       prompt: input.prompt,
       jsonResponse: input.jsonResponse,
+      customFetch: tauriFetch,
     });
 
     return {
@@ -336,6 +343,7 @@ export class AzureOpenAIGenerateTextRepo extends BaseGenerateTextRepo {
       endpoint: this.endpoint,
       deploymentName: this.deploymentName,
       input,
+      customFetch: tauriFetch,
     });
   }
 }
@@ -357,6 +365,7 @@ export class DeepseekGenerateTextRepo extends BaseGenerateTextRepo {
       prompt: input.prompt,
       system: input.system ?? undefined,
       jsonResponse: input.jsonResponse,
+      customFetch: tauriFetch,
     });
 
     return {
@@ -373,6 +382,7 @@ export class DeepseekGenerateTextRepo extends BaseGenerateTextRepo {
       apiKey: this.apiKey,
       model: this.model,
       input,
+      customFetch: tauriFetch,
     });
   }
 }
@@ -431,6 +441,7 @@ export class ClaudeGenerateTextRepo extends BaseGenerateTextRepo {
       prompt: input.prompt,
       system: input.system ?? undefined,
       jsonResponse: input.jsonResponse,
+      customFetch: tauriFetch,
     });
 
     return {
@@ -447,6 +458,7 @@ export class ClaudeGenerateTextRepo extends BaseGenerateTextRepo {
       apiKey: this.apiKey,
       model: this.model,
       input,
+      customFetch: tauriFetch,
     });
   }
 }

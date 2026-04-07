@@ -188,6 +188,8 @@ export const DictationLanguageDialog = () => {
         id: existingPrimaryHotkey?.id ?? createId(),
         actionName: DICTATE_HOTKEY,
         keys: primaryRow.hotkeyKeys,
+        isDeleted: false,
+        updatedAt: null,
       };
 
       const existingAdditionalIds = Object.values(state.hotkeyById)
@@ -200,6 +202,8 @@ export const DictationLanguageDialog = () => {
         id: createId(),
         actionName: getAdditionalLanguageActionName(row.language),
         keys: row.hotkeyKeys,
+        isDeleted: false,
+        updatedAt: null,
       }));
 
       produceAppState((draft) => {

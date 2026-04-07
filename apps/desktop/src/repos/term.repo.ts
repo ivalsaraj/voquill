@@ -13,6 +13,7 @@ type LocalTerm = {
   destinationValue: string;
   isReplacement: boolean;
   isDeleted: boolean;
+  updatedAt: string | null;
 };
 
 const toLocalTerm = (term: Term): LocalTerm => ({
@@ -22,7 +23,8 @@ const toLocalTerm = (term: Term): LocalTerm => ({
   sourceValue: term.sourceValue,
   destinationValue: term.destinationValue,
   isReplacement: term.isReplacement,
-  isDeleted: false,
+  isDeleted: term.isDeleted,
+  updatedAt: term.updatedAt,
 });
 
 const fromLocalTerm = (term: LocalTerm): Term => ({
@@ -31,6 +33,8 @@ const fromLocalTerm = (term: LocalTerm): Term => ({
   sourceValue: term.sourceValue,
   destinationValue: term.destinationValue,
   isReplacement: term.isReplacement,
+  isDeleted: term.isDeleted,
+  updatedAt: term.updatedAt,
 });
 
 export abstract class BaseTermRepo extends BaseRepo {
@@ -38,6 +42,7 @@ export abstract class BaseTermRepo extends BaseRepo {
   abstract createTerm(term: Term): Promise<Term>;
   abstract updateTerm(term: Term): Promise<Term>;
   abstract deleteTerm(termId: string): Promise<void>;
+  listTermsAll?(): Promise<Term[]>;
 }
 
 export class LocalTermRepo extends BaseTermRepo {
@@ -62,6 +67,11 @@ export class LocalTermRepo extends BaseTermRepo {
 
   async deleteTerm(termId: string): Promise<void> {
     await invoke<void>("term_delete", { id: termId });
+  }
+
+  async listTermsAll(): Promise<Term[]> {
+    const terms = await invoke<LocalTerm[]>("term_list_all");
+    return terms.map(fromLocalTerm);
   }
 }
 

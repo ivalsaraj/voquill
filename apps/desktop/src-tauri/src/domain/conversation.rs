@@ -5,4 +5,6 @@ pub struct Conversation {
     pub title: String,
     pub created_at: i64,
     pub updated_at: i64,
+    #[serde(default)]
+    pub is_deleted: bool,
 }

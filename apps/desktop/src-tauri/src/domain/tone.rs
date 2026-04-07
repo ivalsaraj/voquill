@@ -8,4 +8,8 @@ pub struct Tone {
     pub prompt_template: String,
     pub created_at: i64,
     pub sort_order: i32,
+    #[serde(default)]
+    pub is_deleted: bool,
+    #[serde(default)]
+    pub updated_at: Option<String>,
 }

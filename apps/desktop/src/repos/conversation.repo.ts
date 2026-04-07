@@ -8,6 +8,7 @@ type LocalConversation = {
   title: string;
   createdAt: number;
   updatedAt: number;
+  isDeleted: boolean;
 };
 
 const fromLocalConversation = (local: LocalConversation): Conversation => ({
@@ -15,6 +16,7 @@ const fromLocalConversation = (local: LocalConversation): Conversation => ({
   title: local.title,
   createdAt: dayjs(local.createdAt).toISOString(),
   updatedAt: dayjs(local.updatedAt).toISOString(),
+  isDeleted: local.isDeleted,
 });
 
 const toLocalConversation = (
@@ -24,6 +26,7 @@ const toLocalConversation = (
   title: conversation.title,
   createdAt: dayjs(conversation.createdAt).valueOf(),
   updatedAt: dayjs(conversation.updatedAt).valueOf(),
+  isDeleted: conversation.isDeleted,
 });
 
 export abstract class BaseConversationRepo extends BaseRepo {
@@ -35,6 +38,7 @@ export abstract class BaseConversationRepo extends BaseRepo {
     conversation: Conversation,
   ): Promise<Conversation>;
   abstract deleteConversation(id: string): Promise<void>;
+  listConversationsAll?(): Promise<Conversation[]>;
 }
 
 export class LocalConversationRepo extends BaseConversationRepo {
@@ -59,5 +63,10 @@ export class LocalConversationRepo extends BaseConversationRepo {
 
   async deleteConversation(id: string): Promise<void> {
     await invoke("conversation_delete", { id });
+  }
+
+  async listConversationsAll(): Promise<Conversation[]> {
+    const locals = await invoke<LocalConversation[]>("conversation_list_all");
+    return locals.map(fromLocalConversation);
   }
 }

@@ -40,10 +40,11 @@ export const CLAUDE_MODELS = [
 ] as const;
 export type ClaudeModel = (typeof CLAUDE_MODELS)[number];
 
-const createClient = (apiKey: string) => {
+const createClient = (apiKey: string, customFetch?: typeof globalThis.fetch) => {
   return new Anthropic({
     apiKey: apiKey.trim(),
     dangerouslyAllowBrowser: true,
+    fetch: customFetch,
   });
 };
 
@@ -53,6 +54,7 @@ export type ClaudeGenerateTextArgs = {
   system?: string;
   prompt: string;
   jsonResponse?: JsonResponse;
+  customFetch?: typeof globalThis.fetch;
 };
 
 export type ClaudeGenerateResponseOutput = {
@@ -66,11 +68,12 @@ export const claudeGenerateTextResponse = async ({
   system,
   prompt,
   jsonResponse,
+  customFetch,
 }: ClaudeGenerateTextArgs): Promise<ClaudeGenerateResponseOutput> => {
   return retry({
     retries: 3,
     fn: async () => {
-      const client = createClient(apiKey);
+      const client = createClient(apiKey, customFetch);
 
       let finalPrompt = prompt;
       if (jsonResponse) {
@@ -106,12 +109,14 @@ export const claudeGenerateTextResponse = async ({
 
 export type ClaudeTestIntegrationArgs = {
   apiKey: string;
+  customFetch?: typeof globalThis.fetch;
 };
 
 export const claudeTestIntegration = async ({
   apiKey,
+  customFetch,
 }: ClaudeTestIntegrationArgs): Promise<boolean> => {
-  const client = createClient(apiKey);
+  const client = createClient(apiKey, customFetch);
 
   const response = await client.messages.create({
     model: "claude-3-haiku-20240307",
@@ -215,14 +220,16 @@ export type ClaudeStreamChatArgs = {
   apiKey: string;
   model: string;
   input: LlmChatInput;
+  customFetch?: typeof globalThis.fetch;
 };
 
 export async function* claudeStreamChat({
   apiKey,
   model,
   input,
+  customFetch,
 }: ClaudeStreamChatArgs): AsyncGenerator<LlmStreamEvent> {
-  const client = createClient(apiKey);
+  const client = createClient(apiKey, customFetch);
   const { system, messages } = llmMessagesToClaude(input.messages);
 
   const tools: Tool[] | undefined =

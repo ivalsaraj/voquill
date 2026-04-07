@@ -1,6 +1,7 @@
 import { Tone } from "@voquill/types";
 import { getIntl } from "../i18n/intl";
 import { getToneRepo, getUserPreferencesRepo } from "../repos";
+import { triggerEventSync } from "./sync-scheduler";
 import { ToneEditorMode } from "../state/tone-editor.state";
 import { getAppState, produceAppState } from "../store";
 import { registerTones } from "../utils/app.utils";
@@ -31,6 +32,7 @@ export const upsertTone = async (tone: Tone): Promise<Tone> => {
     });
 
     await activateAndSelectTone(saved.id);
+    triggerEventSync();
 
     showSnackbar("Tone saved successfully", { mode: "success" });
     return saved;
@@ -46,11 +48,11 @@ export const upsertTone = async (tone: Tone): Promise<Tone> => {
 export const deleteTone = async (id: string): Promise<void> => {
   try {
     await getToneRepo().deleteTone(id);
+    triggerEventSync();
 
     produceAppState((draft) => {
       delete draft.toneById[id];
 
-      // Clear selection if deleting the currently selected tone
       if (draft.tones.selectedToneId === id) {
         draft.tones.selectedToneId = null;
       }

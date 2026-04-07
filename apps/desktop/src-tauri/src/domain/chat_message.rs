@@ -7,4 +7,8 @@ pub struct ChatMessage {
     pub content: String,
     pub created_at: i64,
     pub metadata: Option<String>,
+    #[serde(default)]
+    pub is_deleted: bool,
+    #[serde(default)]
+    pub updated_at: Option<String>,
 }

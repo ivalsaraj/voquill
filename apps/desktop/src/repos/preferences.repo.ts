@@ -49,6 +49,11 @@ type LocalUserPreferences = {
   remoteReceiverAutoStart: boolean;
   dictationAudioDim: number;
   pasteKeybind: Nullable<string>;
+  googleDriveEmail: Nullable<string>;
+  googleDriveSyncMode: Nullable<string>;
+  googleDriveSyncIntervalMinutes: Nullable<number>;
+  googleDriveLastSyncedAt: Nullable<string>;
+  updatedAt: Nullable<string>;
   useNewBackend: boolean;
 };
 
@@ -105,6 +110,11 @@ const fromLocalPreferences = (
   remoteReceiverAutoStart: preferences.remoteReceiverAutoStart ?? false,
   dictationAudioDim: preferences.dictationAudioDim ?? 1.0,
   pasteKeybind: preferences.pasteKeybind ?? null,
+  googleDriveEmail: preferences.googleDriveEmail ?? null,
+  googleDriveSyncMode: preferences.googleDriveSyncMode ?? null,
+  googleDriveSyncIntervalMinutes: preferences.googleDriveSyncIntervalMinutes ?? null,
+  googleDriveLastSyncedAt: preferences.googleDriveLastSyncedAt ?? null,
+  updatedAt: preferences.updatedAt ?? null,
 });
 
 const toLocalPreferences = (
@@ -148,6 +158,11 @@ const toLocalPreferences = (
   remoteReceiverAutoStart: preferences.remoteReceiverAutoStart ?? false,
   dictationAudioDim: preferences.dictationAudioDim ?? 1.0,
   pasteKeybind: preferences.pasteKeybind ?? null,
+  googleDriveEmail: preferences.googleDriveEmail ?? null,
+  googleDriveSyncMode: preferences.googleDriveSyncMode ?? null,
+  googleDriveSyncIntervalMinutes: preferences.googleDriveSyncIntervalMinutes ?? null,
+  googleDriveLastSyncedAt: preferences.googleDriveLastSyncedAt ?? null,
+  updatedAt: preferences.updatedAt ?? null,
   useNewBackend: true,
 });
 

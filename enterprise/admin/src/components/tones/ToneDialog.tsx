@@ -85,6 +85,8 @@ export const ToneDialog = ({
         systemPromptTemplate: form.isTemplateTone
           ? form.systemPromptTemplate
           : "",
+        isDeleted: existing?.isDeleted ?? false,
+        updatedAt: new Date().toISOString(),
       });
       onClose();
     } finally {

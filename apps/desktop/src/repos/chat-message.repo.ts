@@ -10,6 +10,8 @@ type LocalChatMessage = {
   content: string;
   createdAt: number;
   metadata: Nullable<string>;
+  isDeleted: boolean;
+  updatedAt: string | null;
 };
 
 const fromLocalChatMessage = (local: LocalChatMessage): ChatMessage => ({
@@ -19,6 +21,8 @@ const fromLocalChatMessage = (local: LocalChatMessage): ChatMessage => ({
   content: local.content,
   createdAt: dayjs(local.createdAt).toISOString(),
   metadata: local.metadata ? JSON.parse(local.metadata) : null,
+  isDeleted: local.isDeleted,
+  updatedAt: local.updatedAt,
 });
 
 const toLocalChatMessage = (message: ChatMessage): LocalChatMessage => ({
@@ -28,6 +32,8 @@ const toLocalChatMessage = (message: ChatMessage): LocalChatMessage => ({
   content: message.content,
   createdAt: dayjs(message.createdAt).valueOf(),
   metadata: message.metadata ? JSON.stringify(message.metadata) : null,
+  isDeleted: message.isDeleted,
+  updatedAt: message.updatedAt,
 });
 
 export abstract class BaseChatMessageRepo extends BaseRepo {
@@ -35,6 +41,7 @@ export abstract class BaseChatMessageRepo extends BaseRepo {
   abstract createChatMessage(message: ChatMessage): Promise<ChatMessage>;
   abstract updateChatMessage(message: ChatMessage): Promise<ChatMessage>;
   abstract deleteChatMessages(ids: string[]): Promise<void>;
+  listChatMessagesAll?(conversationId: string): Promise<ChatMessage[]>;
 }
 
 export class LocalChatMessageRepo extends BaseChatMessageRepo {
@@ -61,5 +68,12 @@ export class LocalChatMessageRepo extends BaseChatMessageRepo {
 
   async deleteChatMessages(ids: string[]): Promise<void> {
     await invoke("chat_message_delete_many", { ids });
+  }
+
+  async listChatMessagesAll(conversationId: string): Promise<ChatMessage[]> {
+    const locals = await invoke<LocalChatMessage[]>("chat_message_list_all", {
+      conversationId,
+    });
+    return locals.map(fromLocalChatMessage);
   }
 }

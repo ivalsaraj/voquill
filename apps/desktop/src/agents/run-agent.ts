@@ -86,6 +86,8 @@ export async function runAgent(
               content: "",
               createdAt: new Date().toISOString(),
               metadata: null,
+              isDeleted: false,
+              updatedAt: null,
             };
             const ids =
               draft.chatMessageIdsByConversationId[conversationId] ?? [];
@@ -166,6 +168,8 @@ export async function runAgent(
               toolName: event.toolName,
               ...(reason && { reason }),
             },
+            isDeleted: false,
+            updatedAt: null,
           });
           produceAppState((draft) => {
             if (currentMessageId) {

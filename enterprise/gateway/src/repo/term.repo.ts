@@ -10,6 +10,8 @@ function rowToTerm(row: TermRow): Term {
     destinationValue: row.destination_value,
     isReplacement: row.is_replacement,
     isGlobal: row.is_global,
+    isDeleted: false,
+    updatedAt: row.created_at.toISOString(),
   };
 }
 

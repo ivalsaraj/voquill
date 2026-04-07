@@ -1,3 +1,4 @@
+import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
 import { invokeHandler } from "@voquill/functions";
 import { Nullable } from "@voquill/types";
 import { batchAsync } from "@voquill/utilities";
@@ -297,6 +298,7 @@ export class GroqTranscribeAudioRepo extends BaseTranscribeAudioRepo {
       ext: "wav",
       prompt: input.prompt ?? undefined,
       language: input.language,
+      customFetch: tauriFetch,
     });
 
     return {
@@ -346,6 +348,7 @@ export class OpenAITranscribeAudioRepo extends BaseTranscribeAudioRepo {
       ext: "wav",
       prompt: input.prompt ?? undefined,
       language: input.language,
+      customFetch: tauriFetch,
     });
 
     return {

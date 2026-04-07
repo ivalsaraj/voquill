@@ -4,8 +4,52 @@ use crate::commands::{ScreenContextInfo, TextFieldInfo};
 use core_foundation::array::{CFArrayGetCount, CFArrayGetValueAtIndex};
 use core_foundation::base::{CFGetTypeID, CFRelease, CFTypeRef, TCFType};
 use core_foundation::string::{CFString, CFStringGetTypeID, CFStringRef};
+use std::ffi::c_void;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::ptr;
+
+extern "C" {
+    fn dispatch_sync_f(queue: *mut c_void, context: *mut c_void, work: extern "C" fn(*mut c_void));
+    static _dispatch_main_q: u8;
+}
+
+fn run_on_main_thread<F, R>(f: F) -> R
+where
+    F: FnOnce() -> R + Send,
+    R: Send,
+{
+    struct Context<F, R> {
+        f: Option<F>,
+        result: Option<R>,
+    }
+
+    extern "C" fn trampoline<F, R>(ctx: *mut c_void)
+    where
+        F: FnOnce() -> R,
+    {
+        unsafe {
+            let ctx = &mut *(ctx as *mut Context<F, R>);
+            let f = ctx.f.take().unwrap();
+            ctx.result = Some(f());
+        }
+    }
+
+    let mut ctx = Context {
+        f: Some(f),
+        result: None,
+    };
+
+    unsafe {
+        let main_q = &_dispatch_main_q as *const u8 as *mut c_void;
+        dispatch_sync_f(
+            main_q,
+            &mut ctx as *mut Context<F, R> as *mut c_void,
+            trampoline::<F, R>,
+        );
+    }
+
+    ctx.result.unwrap()
+}
 
 // AXUIElement types and functions from ApplicationServices framework
 type AXUIElementRef = CFTypeRef;
@@ -758,10 +802,12 @@ unsafe fn gather_screen_context(element: CFTypeRef, depth: usize) -> String {
 
 pub fn insert_text_at_cursor(text: &str) -> Result<(), String> {
     let text = text.to_string();
-    catch_unwind(AssertUnwindSafe(move || unsafe {
-        insert_text_at_cursor_impl(&text)
-    }))
-    .unwrap_or_else(|_| Err("accessibility insert panicked".to_string()))
+    run_on_main_thread(move || {
+        catch_unwind(AssertUnwindSafe(move || unsafe {
+            insert_text_at_cursor_impl(&text)
+        }))
+        .unwrap_or_else(|_| Err("accessibility insert panicked".to_string()))
+    })
 }
 
 unsafe fn insert_text_at_cursor_impl(text: &str) -> Result<(), String> {
@@ -834,38 +880,25 @@ unsafe fn insert_text_at_cursor_impl(text: &str) -> Result<(), String> {
 }
 
 pub fn get_selected_text() -> Option<String> {
-    catch_unwind(AssertUnwindSafe(|| unsafe { get_selected_text_impl() })).unwrap_or_else(|_| {
-        log::error!("get_selected_text panicked, returning None");
-        None
-    })
+    use std::{thread, time::Duration};
+
+    // Wait for hotkey modifier keys to physically release before simulating Cmd+C
+    thread::sleep(Duration::from_millis(50));
+
+    let mut clipboard = arboard::Clipboard::new().ok()?;
+    let previous = crate::platform::SavedClipboard::save(&mut clipboard);
+    clipboard.clear().ok();
+
+    super::input::simulate_cmd_c().ok()?;
+    thread::sleep(Duration::from_millis(100));
+
+    let selected = clipboard.get_text().ok();
+
+    thread::spawn(move || {
+        thread::sleep(Duration::from_millis(100));
+        previous.restore();
+    });
+
+    selected.filter(|s| !s.is_empty())
 }
 
-unsafe fn get_selected_text_impl() -> Option<String> {
-    let ax_focused_ui_element = CFString::new("AXFocusedUIElement");
-    let ax_selected_text = CFString::new("AXSelectedText");
-
-    let system_wide = AXUIElementCreateSystemWide();
-    if system_wide.is_null() {
-        return None;
-    }
-
-    let mut focused_element: CFTypeRef = ptr::null();
-    let result = AXUIElementCopyAttributeValue(
-        system_wide,
-        ax_focused_ui_element.as_concrete_TypeRef(),
-        &mut focused_element,
-    );
-
-    CFRelease(system_wide);
-
-    if result != AX_ERROR_SUCCESS || focused_element.is_null() {
-        return None;
-    }
-
-    let selected_text =
-        get_string_attribute(focused_element, ax_selected_text.as_concrete_TypeRef());
-
-    CFRelease(focused_element);
-
-    selected_text.filter(|s| !s.is_empty())
-}

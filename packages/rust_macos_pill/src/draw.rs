@@ -2,7 +2,7 @@ use crate::gfx::{self, Ctx};
 use crate::ipc::{Phase, PillPermission, PillStreaming};
 
 use crate::constants::*;
-use crate::state::{ClickAction, ClickRegion, PillState};
+use crate::state::{ClickAction, ClickRegion, PillState, RocketPhase};
 
 pub(crate) fn draw_all(ctx: &Ctx, state: &PillState, view_w: f64, view_h: f64) {
     ctx.paint_clear(view_w, view_h);
@@ -23,9 +23,13 @@ pub(crate) fn draw_all(ctx: &Ctx, state: &PillState, view_w: f64, view_h: f64) {
 
     if state.assistant_active.get() || state.panel_open_t.get() > 0.01 {
         draw_assistant_panel(ctx, state, ww, wh);
-    } else {
+    } else if state.flash_t.get() < 0.01 {
         let pill_area_top = wh - PILL_AREA_HEIGHT;
         draw_tooltip(ctx, state, ww, pill_area_top);
+    }
+
+    if !state.assistant_active.get() && state.flame_active.get() {
+        draw_flame(ctx, state, ww, wh);
     }
 
     draw_pill(ctx, state, ww, wh);
@@ -35,6 +39,14 @@ pub(crate) fn draw_all(ctx: &Ctx, state: &PillState, view_w: f64, view_h: f64) {
     }
 
     if !state.assistant_active.get() {
+        if !state.fireworks_rockets.borrow().is_empty() {
+            draw_fireworks(ctx, state, ww, wh);
+        }
+
+        if state.flash_t.get() > 0.01 {
+            draw_flash_message(ctx, state, ww, wh);
+        }
+
         draw_cancel_button(ctx, state, ww, wh);
     }
 
@@ -78,11 +90,6 @@ fn draw_pill(ctx: &Ctx, state: &PillState, ww: f64, wh: f64) {
     ctx.set_source_rgba(0.0, 0.0, 0.0, bg_alpha);
     ctx.fill();
 
-    gfx::rounded_rect(ctx, rx + 0.5, ry + 0.5, pill_w - 1.0, pill_h - 1.0, radius - 0.5);
-    ctx.set_source_rgba(1.0, 1.0, 1.0, BORDER_ALPHA);
-    ctx.set_line_width(1.0);
-    ctx.stroke();
-
     match state.phase.get() {
         Phase::Recording if expand_t > 0.1 => {
             draw_waveform(ctx, rx, ry, pill_w, pill_h, expand_t, state);
@@ -96,6 +103,11 @@ fn draw_pill(ctx: &Ctx, state: &PillState, ww: f64, wh: f64) {
         }
         _ => {}
     }
+
+    gfx::rounded_rect(ctx, rx + 0.5, ry + 0.5, pill_w - 1.0, pill_h - 1.0, radius - 0.5);
+    ctx.set_source_rgba(1.0, 1.0, 1.0, BORDER_ALPHA);
+    ctx.set_line_width(1.0);
+    ctx.stroke();
 
     state.click_regions.borrow_mut().push(ClickRegion {
         x: rx, y: ry, w: pill_w, h: pill_h,
@@ -126,10 +138,12 @@ fn draw_waveform(
         ctx.set_line_cap_round();
         ctx.set_line_join_round();
 
-        let segments = (pill_w / 2.0).max(72.0) as i32;
+        let pad = pill_h * 0.1;
+        let wave_w = pill_w - pad * 2.0;
+        let segments = (wave_w / 2.0).max(72.0) as i32;
         for i in 0..=segments {
             let t = i as f64 / segments as f64;
-            let x = rx + pill_w * t;
+            let x = rx + pad + wave_w * t;
             let theta = config.frequency * t * TAU + phase;
             let y = baseline + amplitude * theta.sin();
 
@@ -190,22 +204,38 @@ fn draw_loading(
 
     let bar_h = 2.0;
     let bar_y = ry + (pill_h - bar_h) / 2.0;
-    let bar_w = pill_w * LOADING_BAR_WIDTH_FRAC;
-    let offset = state.loading_offset.get();
-    let bar_x = rx + (pill_w + bar_w) * offset - bar_w;
+    let pad = pill_h * 0.1;
+    let track_x = rx + pad;
+    let track_w = pill_w - pad * 2.0;
 
-    let alpha = 0.7 * expand_t;
-    ctx.draw_linear_gradient_in_rect(
-        bar_x, bar_y, bar_w, bar_h,
-        bar_x, 0.0, bar_x + bar_w, 0.0,
-        &[
-            (0.0, 1.0, 1.0, 1.0, 0.0),
-            (0.5, 1.0, 1.0, 1.0, alpha),
-            (1.0, 1.0, 1.0, 1.0, 0.0),
-        ],
-    );
+    // Track line
+    ctx.set_source_rgba(1.0, 1.0, 1.0, 0.15 * expand_t);
+    ctx.set_line_width(bar_h);
+    ctx.set_line_cap_round();
+    ctx.move_to(track_x, bar_y + bar_h / 2.0);
+    ctx.line_to(track_x + track_w, bar_y + bar_h / 2.0);
+    ctx.stroke();
+
+    // Moving indicator
+    let indicator_w = track_w * LOADING_BAR_WIDTH_FRAC;
+    let offset = state.loading_offset.get();
+    let ind_x = track_x + (track_w + indicator_w) * offset - indicator_w;
+
+    ctx.set_source_rgba(1.0, 1.0, 1.0, 0.7 * expand_t);
+    ctx.set_line_width(bar_h);
+    ctx.set_line_cap_round();
+
+    let draw_left = ind_x.max(track_x);
+    let draw_right = (ind_x + indicator_w).min(track_x + track_w);
+    if draw_right > draw_left {
+        ctx.move_to(draw_left, bar_y + bar_h / 2.0);
+        ctx.line_to(draw_right, bar_y + bar_h / 2.0);
+        ctx.stroke();
+    }
 
     ctx.restore();
+
+    draw_edge_gradient(ctx, rx, ry, pill_w, pill_h, radius, expand_t);
 }
 
 fn draw_idle_label(ctx: &Ctx, rx: f64, ry: f64, pill_w: f64, pill_h: f64, expand_t: f64) {
@@ -287,6 +317,255 @@ fn draw_tooltip(ctx: &Ctx, state: &PillState, ww: f64, pill_area_top: f64) {
         x: mid_x, y: tooltip_ry, w: tooltip_rx + tooltip_w - mid_x, h: TOOLTIP_HEIGHT,
         action: ClickAction::StyleForward,
     });
+}
+
+// ── Flash message ────────────────────────────────────────────────
+
+fn draw_flash_message(ctx: &Ctx, state: &PillState, ww: f64, wh: f64) {
+    let flash_t = state.flash_t.get();
+    if flash_t < 0.01 {
+        return;
+    }
+
+    let message = state.flash_message.borrow();
+    if message.is_empty() {
+        return;
+    }
+
+    let is_error = state.flash_is_error.get();
+    let action_label = state.flash_action_label.borrow();
+    let has_action = action_label.is_some();
+
+    ctx.select_font_face("sans-serif", false, true);
+    ctx.set_font_size(12.0);
+    let text_extents = ctx.text_extents(&message);
+
+    let action_w = if let Some(ref label) = *action_label {
+        ctx.select_font_face("sans-serif", false, true);
+        ctx.set_font_size(11.0);
+        let ext = ctx.text_extents(label);
+        ext.width + FLASH_ACTION_PADDING_H * 2.0
+    } else {
+        0.0
+    };
+    let action_section = if has_action { FLASH_ACTION_GAP + action_w } else { 0.0 };
+
+    let flash_w = (text_extents.width + FLASH_PADDING_H * 2.0 + action_section).max(80.0);
+
+    let scale = FLASH_MIN_SCALE + (1.0 - FLASH_MIN_SCALE) * flash_t;
+    let alpha = flash_t;
+
+    let (_, pill_y, _, _) = pill_position(state, ww, wh);
+    let full_x = (ww - flash_w) / 2.0;
+    let full_y = pill_y - FLASH_GAP - FLASH_HEIGHT;
+
+    let center_x = full_x + flash_w / 2.0;
+    let center_y = full_y + FLASH_HEIGHT / 2.0;
+
+    ctx.save();
+    ctx.translate(center_x, center_y);
+    ctx.scale(scale, scale);
+    ctx.translate(-center_x, -center_y);
+
+    // Background
+    let (bg_r, bg_g, bg_b) = if is_error { (0.35, 0.05, 0.05) } else { (0.0, 0.0, 0.0) };
+    gfx::rounded_rect(ctx, full_x, full_y, flash_w, FLASH_HEIGHT, FLASH_RADIUS);
+    ctx.set_source_rgba(bg_r, bg_g, bg_b, 0.92 * alpha);
+    ctx.fill();
+
+    // Message text
+    ctx.set_source_rgba(1.0, 1.0, 1.0, 0.9 * alpha);
+    ctx.select_font_face("sans-serif", false, true);
+    ctx.set_font_size(12.0);
+    let text_left = if has_action {
+        full_x + FLASH_PADDING_H
+    } else {
+        full_x + (flash_w - text_extents.width) / 2.0
+    };
+    let tx = text_left - text_extents.x_bearing;
+    let ty = full_y + (FLASH_HEIGHT - text_extents.height) / 2.0 - text_extents.y_bearing;
+    ctx.move_to(tx, ty);
+    ctx.show_text(&message);
+
+    // Action button
+    if let Some(ref label) = *action_label {
+        let btn_x = full_x + flash_w - FLASH_PADDING_H - action_w;
+        let btn_y = full_y + (FLASH_HEIGHT - FLASH_ACTION_HEIGHT) / 2.0;
+
+        gfx::rounded_rect(ctx, btn_x, btn_y, action_w, FLASH_ACTION_HEIGHT, FLASH_ACTION_RADIUS);
+        ctx.set_source_rgba(1.0, 1.0, 1.0, 0.2 * alpha);
+        ctx.fill();
+
+        ctx.set_source_rgba(1.0, 1.0, 1.0, 0.95 * alpha);
+        ctx.select_font_face("sans-serif", false, true);
+        ctx.set_font_size(11.0);
+        let label_ext = ctx.text_extents(label);
+        let lx = btn_x + (action_w - label_ext.width) / 2.0 - label_ext.x_bearing;
+        let ly = btn_y + (FLASH_ACTION_HEIGHT - label_ext.height) / 2.0 - label_ext.y_bearing;
+        ctx.move_to(lx, ly);
+        ctx.show_text(label);
+
+        state.click_regions.borrow_mut().push(ClickRegion {
+            x: btn_x,
+            y: btn_y,
+            w: action_w,
+            h: FLASH_ACTION_HEIGHT,
+            action: ClickAction::FlashAction,
+        });
+    }
+
+    ctx.restore();
+}
+
+// ── Flame ────────────────────────────────────────────────────────
+
+fn draw_flame_tongue(ctx: &Ctx, cx: f64, base_y: f64, h: f64, hw: f64, sway: f64,
+    gradient_stops: &[(f64, f64, f64, f64, f64)],
+) {
+    use std::f64::consts::PI;
+    let tip_x = cx + sway;
+    let tip_y = base_y - h;
+    let base_r = hw.min(h * 0.15);
+
+    ctx.save();
+    ctx.new_sub_path();
+    // Start at left side, just above the rounded base
+    ctx.move_to(cx - hw, base_y - base_r);
+    // Left edge: bulges out slightly in lower third, then narrows to tip
+    ctx.curve_to(
+        cx - hw * 1.15, base_y - h * 0.35,
+        cx - hw * 0.12 + sway * 0.3, base_y - h * 0.72,
+        tip_x, tip_y,
+    );
+    // Right edge: mirror, tip back down to base
+    ctx.curve_to(
+        cx + hw * 0.12 + sway * 0.3, base_y - h * 0.72,
+        cx + hw * 1.15, base_y - h * 0.35,
+        cx + hw, base_y - base_r,
+    );
+    // Rounded bottom: arc from right to left
+    ctx.arc(cx, base_y - base_r, hw, 0.0, PI);
+    ctx.close_path();
+    ctx.clip();
+    ctx.draw_gradient_raw(cx, base_y, cx, tip_y, gradient_stops);
+    ctx.restore();
+}
+
+fn draw_flame(ctx: &Ctx, state: &PillState, ww: f64, wh: f64) {
+    let elapsed = state.flame_elapsed.get();
+    let tongues = state.flame_tongues.borrow();
+    if tongues.is_empty() {
+        return;
+    }
+
+    let (pill_x, pill_y, pill_w, pill_h) = pill_position(state, ww, wh);
+    let base_y = pill_y + pill_h * 0.35;
+    let inset = pill_w * 0.12;
+    let usable = pill_w - inset * 2.0;
+
+    let fade_in = (elapsed / 0.3).clamp(0.0, 1.0);
+    let fade_out = ((FLAME_TOTAL_DURATION - elapsed) / 0.8).clamp(0.0, 1.0);
+    let alpha = fade_in * fade_out;
+    if alpha < 0.01 {
+        return;
+    }
+
+    for tongue in tongues.iter() {
+        let flicker = (tongue.phase.sin() * 0.5 + 0.5) * 0.25 + 0.75;
+        let flicker2 = ((tongue.phase * 1.6 + 0.8).sin() * 0.5 + 0.5) * 0.15 + 0.85;
+        let h = tongue.height * flicker * flicker2;
+        let w = tongue.width * (0.85 + 0.15 * flicker);
+        let hw = w / 2.0;
+
+        let sway = tongue.phase.sin() * FLAME_SWAY
+            + (tongue.phase * 1.7 + 1.0).sin() * FLAME_SWAY * 0.4;
+
+        let base_x = pill_x + inset + usable * tongue.t;
+        let cx = base_x + sway * 0.3;
+
+        // Layer 1: outer glow — wide, soft, dim
+        draw_flame_tongue(ctx, cx, base_y, h * 1.2, hw * 1.5, sway * 1.1,
+            &[
+                (0.0, 0.7, 0.7, 0.7, alpha * 0.15),
+                (0.4, 0.4, 0.4, 0.4, alpha * 0.08),
+                (1.0, 0.0, 0.0, 0.0, 0.0),
+            ],
+        );
+
+        // Layer 2: main flame body
+        draw_flame_tongue(ctx, cx, base_y, h, hw, sway,
+            &[
+                (0.0, 1.0, 1.0, 1.0, alpha * 0.85),
+                (0.25, 1.0, 1.0, 1.0, alpha * 0.65),
+                (0.55, 0.8, 0.8, 0.8, alpha * 0.3),
+                (1.0, 0.0, 0.0, 0.0, 0.0),
+            ],
+        );
+
+        // Layer 3: inner bright core — narrow, hot white
+        draw_flame_tongue(ctx, cx, base_y, h * 0.55, hw * 0.35, sway * 0.5,
+            &[
+                (0.0, 1.0, 1.0, 1.0, alpha * 0.95),
+                (0.5, 1.0, 1.0, 1.0, alpha * 0.5),
+                (1.0, 1.0, 1.0, 1.0, 0.0),
+            ],
+        );
+    }
+}
+
+// ── Fireworks ────────────────────────────────────────────────────
+
+fn draw_fireworks(ctx: &Ctx, state: &PillState, _ww: f64, _wh: f64) {
+    let rockets = state.fireworks_rockets.borrow();
+
+    for rocket in rockets.iter() {
+        let (cr, cg, cb) = rocket.color;
+
+        // Trail
+        if rocket.trail.len() > 1 && rocket.trail_alpha > 0.01 {
+            let n = rocket.trail.len();
+            ctx.set_line_width(FIREWORKS_ROCKET_LINE_WIDTH);
+            ctx.set_line_cap_round();
+            for i in 1..n {
+                let alpha = (i as f64 / n as f64) * rocket.trail_alpha * 0.8;
+                ctx.set_source_rgba(cr, cg, cb, alpha);
+                ctx.move_to(rocket.trail[i - 1].0, rocket.trail[i - 1].1);
+                ctx.line_to(rocket.trail[i].0, rocket.trail[i].1);
+                ctx.stroke();
+            }
+        }
+
+        // Bright head while rising
+        if rocket.phase == RocketPhase::Rising {
+            let hs = FIREWORKS_HEAD_SIZE / 2.0;
+            ctx.set_source_rgba(cr, cg, cb, 0.95);
+            gfx::rounded_rect(ctx, rocket.x - hs, rocket.y - hs, FIREWORKS_HEAD_SIZE, FIREWORKS_HEAD_SIZE, hs);
+            ctx.fill();
+        }
+
+        // Sparks
+        ctx.set_line_width(FIREWORKS_SPARK_LINE_WIDTH);
+        ctx.set_line_cap_round();
+        for spark in &rocket.sparks {
+            if spark.life <= 0.0 {
+                continue;
+            }
+            let alpha = spark.life.clamp(0.0, 1.0) * 0.9;
+            ctx.set_source_rgba(cr, cg, cb, alpha);
+
+            let speed = (spark.vx * spark.vx + spark.vy * spark.vy).sqrt();
+            let line_len = (speed * 0.04).clamp(2.0, 10.0);
+            let (nx, ny) = if speed > 0.01 {
+                (spark.vx / speed, spark.vy / speed)
+            } else {
+                (0.0, -1.0)
+            };
+
+            ctx.move_to(spark.x - nx * line_len, spark.y - ny * line_len);
+            ctx.line_to(spark.x, spark.y);
+            ctx.stroke();
+        }
+    }
 }
 
 // ── Assistant panel ───────────────────────────────────────────────
@@ -770,10 +1049,8 @@ fn draw_keyboard_button(ctx: &Ctx, state: &PillState, ww: f64, wh: f64) {
 }
 
 fn draw_cancel_button(ctx: &Ctx, state: &PillState, ww: f64, wh: f64) {
-    let is_idle = state.phase.get() == Phase::Idle;
-    let hovered = state.hovered.get();
-
-    if is_idle || !hovered || state.assistant_active.get() {
+    let t = state.cancel_t.get();
+    if t < 0.01 {
         return;
     }
 
@@ -783,13 +1060,23 @@ fn draw_cancel_button(ctx: &Ctx, state: &PillState, ww: f64, wh: f64) {
     let cx = btn_x + CANCEL_BUTTON_SIZE / 2.0;
     let cy = btn_y + CANCEL_BUTTON_SIZE / 2.0;
 
-    ctx.set_source_rgba(0.46, 0.46, 0.46, 1.0);
+    let scale = 0.5 + 0.5 * t;
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.scale(scale, scale);
+    ctx.translate(-cx, -cy);
+
+    ctx.set_source_rgba(0.46, 0.46, 0.46, t);
     ctx.draw_symbol("xmark.circle.fill", cx, cy, CANCEL_BUTTON_SIZE - 2.0);
 
-    state.click_regions.borrow_mut().push(ClickRegion {
-        x: btn_x, y: btn_y, w: CANCEL_BUTTON_SIZE, h: CANCEL_BUTTON_SIZE,
-        action: ClickAction::CancelDictation,
-    });
+    ctx.restore();
+
+    if t > 0.5 {
+        state.click_regions.borrow_mut().push(ClickRegion {
+            x: btn_x, y: btn_y, w: CANCEL_BUTTON_SIZE, h: CANCEL_BUTTON_SIZE,
+            action: ClickAction::CancelDictation,
+        });
+    }
 }
 
 fn draw_wrench_icon(ctx: &Ctx, x: f64, y: f64, size: f64, alpha: f64) {

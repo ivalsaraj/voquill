@@ -4,6 +4,37 @@ use crate::ipc::{Phase, PillMessage, PillPermission, PillStreaming, Visibility};
 
 use crate::constants::*;
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) enum RocketPhase {
+    Rising,
+    Exploding,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct Spark {
+    pub(crate) x: f64,
+    pub(crate) y: f64,
+    pub(crate) vx: f64,
+    pub(crate) vy: f64,
+    pub(crate) life: f64,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct Rocket {
+    pub(crate) x: f64,
+    pub(crate) y: f64,
+    pub(crate) vx: f64,
+    pub(crate) vy: f64,
+    pub(crate) trail: Vec<(f64, f64)>,
+    pub(crate) fuse: f64,
+    pub(crate) phase: RocketPhase,
+    pub(crate) num_sparks: usize,
+    pub(crate) launch_index: usize,
+    pub(crate) sparks: Vec<Spark>,
+    pub(crate) trail_alpha: f64,
+    pub(crate) color: (f64, f64, f64),
+}
+
 #[derive(Debug, Clone)]
 pub(crate) enum ClickAction {
     Pill,
@@ -17,6 +48,7 @@ pub(crate) enum ClickAction {
     PermissionDeny(String),
     PermissionAlwaysAllow(String),
     SendButton,
+    FlashAction,
 }
 
 #[derive(Debug, Clone)]
@@ -32,6 +64,15 @@ impl ClickRegion {
     pub(crate) fn contains(&self, px: f64, py: f64) -> bool {
         px >= self.x && px <= self.x + self.w && py >= self.y && py <= self.y + self.h
     }
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct FlameTongue {
+    pub(crate) t: f64,
+    pub(crate) height: f64,
+    pub(crate) width: f64,
+    pub(crate) phase: f64,
+    pub(crate) speed: f64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -114,6 +155,31 @@ pub(crate) struct PillState {
 
     // Entry text (for typing mode)
     pub(crate) entry_text: RefCell<String>,
+
+    // Cancel button animation
+    pub(crate) cancel_t: Cell<f64>,
+    pub(crate) cancel_velocity: Cell<f64>,
+
+    // Flash message / toast
+    pub(crate) flash_message: RefCell<String>,
+    pub(crate) flash_visible: Cell<bool>,
+    pub(crate) flash_t: Cell<f64>,
+    pub(crate) flash_velocity: Cell<f64>,
+    pub(crate) flash_timer: Cell<f64>,
+    pub(crate) flash_is_error: Cell<bool>,
+    pub(crate) flash_action: RefCell<Option<String>>,
+    pub(crate) flash_action_label: RefCell<Option<String>>,
+
+    // Fireworks
+    pub(crate) fireworks_active: Cell<bool>,
+    pub(crate) fireworks_elapsed: Cell<f64>,
+    pub(crate) fireworks_next_launch: Cell<usize>,
+    pub(crate) fireworks_rockets: RefCell<Vec<Rocket>>,
+
+    // Flame
+    pub(crate) flame_active: Cell<bool>,
+    pub(crate) flame_elapsed: Cell<f64>,
+    pub(crate) flame_tongues: RefCell<Vec<FlameTongue>>,
 
     // Actual window allocation (used by PlainWayland for fullscreen overlay positioning)
     pub(crate) alloc_width: Cell<f64>,

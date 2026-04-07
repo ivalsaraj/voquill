@@ -1,8 +1,3 @@
-- The macOS pill now renders on top of full screen windows.
-- Wayland support on Linux, including native setup UI and paste fixes.
-- Global paste keybinding on Linux — configure a custom shortcut to paste from Voquill anywhere.
-- Model providers now dynamically show the latest available models.
-- Air Dictation (alpha) — use your phone as a remote mic for desktop dictation.
-- Fixed audio dimming on Windows.
-- Fixed pill style switching and standard pill sizing across platforms.
-- Various improvements and bug fixes.
+- Add support for Shift+Insert pasting
+- Improve flame affordances
+- Add toast messages to pill for better communication of actions

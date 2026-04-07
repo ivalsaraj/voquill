@@ -18,10 +18,6 @@ impl MacosPill {
     }
 }
 
-pub fn should_use_native_overlays() -> bool {
-    true
-}
-
 pub fn try_create_native_overlays(app: &tauri::AppHandle) -> bool {
     let (in_tx, in_rx) = mpsc::channel::<InMessage>();
     let (out_tx, out_rx) = mpsc::channel::<OutMessage>();
@@ -150,6 +146,10 @@ fn start_out_reader(app: tauri::AppHandle, rx: mpsc::Receiver<OutMessage>) {
                     } else if direction == "backward" {
                         let _ = app.emit_to("main", "tone-switch-backward", ());
                     }
+                }
+                OutMessage::ToastAction { action } => {
+                    let payload = serde_json::json!({ "action": action });
+                    let _ = app.emit_to("main", "toast-action", payload);
                 }
                 OutMessage::Hover { .. } => {}
             }

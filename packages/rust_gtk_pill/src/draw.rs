@@ -5,7 +5,7 @@ use gtk::cairo;
 use crate::ipc::{Phase, PillPermission, PillStreaming};
 
 use crate::constants::*;
-use crate::state::{ClickAction, ClickRegion, PillState};
+use crate::state::{ClickAction, ClickRegion, PillState, RocketPhase};
 
 pub(crate) fn draw_all(cr: &cairo::Context, state: &PillState) {
     cr.set_operator(cairo::Operator::Source);
@@ -24,9 +24,13 @@ pub(crate) fn draw_all(cr: &cairo::Context, state: &PillState) {
 
     if state.assistant_active.get() || state.panel_open_t.get() > 0.01 {
         draw_assistant_panel(cr, state, ww, wh);
-    } else {
+    } else if state.flash_t.get() < 0.01 {
         let pill_area_top = wh - PILL_AREA_HEIGHT;
         draw_tooltip(cr, state, ww, pill_area_top);
+    }
+
+    if !state.assistant_active.get() && state.flame_active.get() {
+        draw_flame(cr, state, ww, wh);
     }
 
     draw_pill(cr, state, ww, wh);
@@ -36,6 +40,14 @@ pub(crate) fn draw_all(cr: &cairo::Context, state: &PillState) {
     }
 
     if !state.assistant_active.get() {
+        if !state.fireworks_rockets.borrow().is_empty() {
+            draw_fireworks(cr, state, ww, wh);
+        }
+
+        if state.flash_t.get() > 0.01 {
+            draw_flash_message(cr, state, ww, wh);
+        }
+
         draw_cancel_button(cr, state, ww, wh);
     }
 
@@ -52,8 +64,9 @@ pub(crate) fn pill_position(state: &PillState, ww: f64, wh: f64) -> (f64, f64, f
         let panel_bottom = wh - PANEL_BOTTOM_MARGIN;
         panel_bottom - PILL_BOTTOM_INSET - pill_h
     } else {
-        let pill_area_top = wh - PILL_AREA_HEIGHT;
-        pill_area_top + (PILL_AREA_HEIGHT - pill_h) / 2.0
+        // Anchor to bottom: pill grows upward from a fixed bottom edge
+        let bottom_offset = 6.0;
+        wh - bottom_offset - pill_h
     };
 
     (pill_x, pill_y, pill_w, pill_h)
@@ -181,20 +194,31 @@ fn draw_loading(
 
     let bar_h = 2.0;
     let bar_y = ry + (pill_h - bar_h) / 2.0;
-    let bar_w = pill_w * LOADING_BAR_WIDTH_FRAC;
-    let offset = state.loading_offset.get();
-    let bar_x = rx + (pill_w + bar_w) * offset - bar_w;
+    let pad = pill_h * 0.1;
+    let track_x = rx + pad;
+    let track_w = pill_w - pad * 2.0;
 
-    let alpha = 0.7 * expand_t;
-    let gradient = cairo::LinearGradient::new(bar_x, 0.0, bar_x + bar_w, 0.0);
-    gradient.add_color_stop_rgba(0.0, 1.0, 1.0, 1.0, 0.0);
-    gradient.add_color_stop_rgba(0.5, 1.0, 1.0, 1.0, alpha);
-    gradient.add_color_stop_rgba(1.0, 1.0, 1.0, 1.0, 0.0);
-    cr.set_source(&gradient).ok();
-    cr.rectangle(bar_x, bar_y, bar_w, bar_h);
+    // Track line
+    cr.set_source_rgba(1.0, 1.0, 1.0, 0.15 * expand_t);
+    cr.rectangle(track_x, bar_y, track_w, bar_h);
     let _ = cr.fill();
 
+    // Moving indicator
+    let indicator_w = track_w * LOADING_BAR_WIDTH_FRAC;
+    let offset = state.loading_offset.get();
+    let ind_x = track_x + (track_w + indicator_w) * offset - indicator_w;
+
+    let draw_left = ind_x.max(track_x);
+    let draw_right = (ind_x + indicator_w).min(track_x + track_w);
+    if draw_right > draw_left {
+        cr.set_source_rgba(1.0, 1.0, 1.0, 0.7 * expand_t);
+        cr.rectangle(draw_left, bar_y, draw_right - draw_left, bar_h);
+        let _ = cr.fill();
+    }
+
     cr.restore().ok();
+
+    draw_edge_gradient(cr, rx, ry, pill_w, pill_h, radius, expand_t);
 }
 
 fn draw_idle_label(cr: &cairo::Context, rx: f64, ry: f64, pill_w: f64, pill_h: f64, expand_t: f64) {
@@ -297,6 +321,256 @@ fn draw_tooltip(cr: &cairo::Context, state: &PillState, ww: f64, pill_area_top: 
         x: mid_x, y: tooltip_ry, w: tooltip_rx + tooltip_w - mid_x, h: TOOLTIP_HEIGHT,
         action: ClickAction::StyleForward,
     });
+}
+
+// ── Flash message ────────────────────────────────────────────────
+
+fn draw_flash_message(cr: &cairo::Context, state: &PillState, ww: f64, wh: f64) {
+    let flash_t = state.flash_t.get();
+    if flash_t < 0.01 {
+        return;
+    }
+
+    let message = state.flash_message.borrow();
+    if message.is_empty() {
+        return;
+    }
+
+    let is_error = state.flash_is_error.get();
+    let action_label = state.flash_action_label.borrow();
+    let has_action = action_label.is_some();
+
+    let layout = pangocairo::functions::create_layout(cr);
+    let font_desc = pango::FontDescription::from_string("sans bold 12");
+    layout.set_font_description(Some(&font_desc));
+    layout.set_text(&message);
+    let (text_w, text_h) = layout.pixel_size();
+    let text_w = text_w as f64;
+    let text_h = text_h as f64;
+
+    let (action_w, action_layout) = if let Some(ref label) = *action_label {
+        let al = pangocairo::functions::create_layout(cr);
+        let af = pango::FontDescription::from_string("sans bold 11");
+        al.set_font_description(Some(&af));
+        al.set_text(label);
+        let (aw, _) = al.pixel_size();
+        (aw as f64 + FLASH_ACTION_PADDING_H * 2.0, Some(al))
+    } else {
+        (0.0, None)
+    };
+    let action_section = if has_action { FLASH_ACTION_GAP + action_w } else { 0.0 };
+
+    let flash_w = (text_w + FLASH_PADDING_H * 2.0 + action_section).max(80.0);
+
+    let scale = FLASH_MIN_SCALE + (1.0 - FLASH_MIN_SCALE) * flash_t;
+    let alpha = flash_t;
+
+    let (_, pill_y, _, _) = pill_position(state, ww, wh);
+    let full_x = (ww - flash_w) / 2.0;
+    let full_y = pill_y - FLASH_GAP - FLASH_HEIGHT;
+
+    let center_x = full_x + flash_w / 2.0;
+    let center_y = full_y + FLASH_HEIGHT / 2.0;
+
+    cr.save().ok();
+    cr.translate(center_x, center_y);
+    cr.scale(scale, scale);
+    cr.translate(-center_x, -center_y);
+
+    // Background
+    let (bg_r, bg_g, bg_b) = if is_error { (0.35, 0.05, 0.05) } else { (0.0, 0.0, 0.0) };
+    rounded_rect(cr, full_x, full_y, flash_w, FLASH_HEIGHT, FLASH_RADIUS);
+    cr.set_source_rgba(bg_r, bg_g, bg_b, 0.92 * alpha);
+    let _ = cr.fill();
+
+    // Message text
+    cr.set_source_rgba(1.0, 1.0, 1.0, 0.9 * alpha);
+    let text_left = if has_action {
+        full_x + FLASH_PADDING_H
+    } else {
+        full_x + (flash_w - text_w) / 2.0
+    };
+    let ty = full_y + (FLASH_HEIGHT - text_h) / 2.0;
+    cr.move_to(text_left, ty);
+    pangocairo::functions::show_layout(cr, &layout);
+
+    // Action button
+    if let Some(al) = action_layout {
+        let btn_x = full_x + flash_w - FLASH_PADDING_H - action_w;
+        let btn_y = full_y + (FLASH_HEIGHT - FLASH_ACTION_HEIGHT) / 2.0;
+
+        rounded_rect(cr, btn_x, btn_y, action_w, FLASH_ACTION_HEIGHT, FLASH_ACTION_RADIUS);
+        cr.set_source_rgba(1.0, 1.0, 1.0, 0.2 * alpha);
+        let _ = cr.fill();
+
+        cr.set_source_rgba(1.0, 1.0, 1.0, 0.95 * alpha);
+        let (lw, lh) = al.pixel_size();
+        let lx = btn_x + (action_w - lw as f64) / 2.0;
+        let ly = btn_y + (FLASH_ACTION_HEIGHT - lh as f64) / 2.0;
+        cr.move_to(lx, ly);
+        pangocairo::functions::show_layout(cr, &al);
+
+        state.click_regions.borrow_mut().push(ClickRegion {
+            x: btn_x,
+            y: btn_y,
+            w: action_w,
+            h: FLASH_ACTION_HEIGHT,
+            action: ClickAction::FlashAction,
+        });
+    }
+
+    cr.restore().ok();
+}
+
+// ── Flame ────────────────────────────────────────────────────────
+
+fn draw_flame_tongue(
+    cr: &cairo::Context, cx: f64, base_y: f64, h: f64, hw: f64, sway: f64,
+    gradient_stops: &[(f64, f64, f64, f64, f64)],
+) {
+    let tip_x = cx + sway;
+    let tip_y = base_y - h;
+    let base_r = hw.min(h * 0.15);
+
+    cr.save().ok();
+    cr.new_sub_path();
+    cr.move_to(cx - hw, base_y - base_r);
+    cr.curve_to(
+        cx - hw * 1.15, base_y - h * 0.35,
+        cx - hw * 0.12 + sway * 0.3, base_y - h * 0.72,
+        tip_x, tip_y,
+    );
+    cr.curve_to(
+        cx + hw * 0.12 + sway * 0.3, base_y - h * 0.72,
+        cx + hw * 1.15, base_y - h * 0.35,
+        cx + hw, base_y - base_r,
+    );
+    cr.arc(cx, base_y - base_r, hw, 0.0, PI);
+    cr.close_path();
+    cr.clip();
+
+    let gradient = cairo::LinearGradient::new(cx, base_y, cx, tip_y);
+    for &(offset, r, g, b, a) in gradient_stops {
+        gradient.add_color_stop_rgba(offset, r, g, b, a);
+    }
+    cr.set_source(&gradient).ok();
+    let _ = cr.paint();
+
+    cr.restore().ok();
+}
+
+fn draw_flame(cr: &cairo::Context, state: &PillState, ww: f64, wh: f64) {
+    let elapsed = state.flame_elapsed.get();
+    let tongues = state.flame_tongues.borrow();
+    if tongues.is_empty() {
+        return;
+    }
+
+    let (pill_x, pill_y, pill_w, pill_h) = pill_position(state, ww, wh);
+    let base_y = pill_y + pill_h * 0.35;
+    let inset = pill_w * 0.12;
+    let usable = pill_w - inset * 2.0;
+
+    let fade_in = (elapsed / 0.3).clamp(0.0, 1.0);
+    let fade_out = ((FLAME_TOTAL_DURATION - elapsed) / 0.8).clamp(0.0, 1.0);
+    let alpha = fade_in * fade_out;
+    if alpha < 0.01 {
+        return;
+    }
+
+    for tongue in tongues.iter() {
+        let flicker = (tongue.phase.sin() * 0.5 + 0.5) * 0.25 + 0.75;
+        let flicker2 = ((tongue.phase * 1.6 + 0.8).sin() * 0.5 + 0.5) * 0.15 + 0.85;
+        let h = tongue.height * flicker * flicker2;
+        let w = tongue.width * (0.85 + 0.15 * flicker);
+        let hw = w / 2.0;
+
+        let sway = tongue.phase.sin() * FLAME_SWAY
+            + (tongue.phase * 1.7 + 1.0).sin() * FLAME_SWAY * 0.4;
+
+        let base_x = pill_x + inset + usable * tongue.t;
+        let cx = base_x + sway * 0.3;
+
+        draw_flame_tongue(cr, cx, base_y, h * 1.2, hw * 1.5, sway * 1.1,
+            &[
+                (0.0, 0.7, 0.7, 0.7, alpha * 0.15),
+                (0.4, 0.4, 0.4, 0.4, alpha * 0.08),
+                (1.0, 0.0, 0.0, 0.0, 0.0),
+            ],
+        );
+
+        draw_flame_tongue(cr, cx, base_y, h, hw, sway,
+            &[
+                (0.0, 1.0, 1.0, 1.0, alpha * 0.85),
+                (0.25, 1.0, 1.0, 1.0, alpha * 0.65),
+                (0.55, 0.8, 0.8, 0.8, alpha * 0.3),
+                (1.0, 0.0, 0.0, 0.0, 0.0),
+            ],
+        );
+
+        draw_flame_tongue(cr, cx, base_y, h * 0.55, hw * 0.35, sway * 0.5,
+            &[
+                (0.0, 1.0, 1.0, 1.0, alpha * 0.95),
+                (0.5, 1.0, 1.0, 1.0, alpha * 0.5),
+                (1.0, 1.0, 1.0, 1.0, 0.0),
+            ],
+        );
+    }
+}
+
+// ── Fireworks ────────────────────────────────────────────────────
+
+fn draw_fireworks(cr: &cairo::Context, state: &PillState, _ww: f64, _wh: f64) {
+    let rockets = state.fireworks_rockets.borrow();
+
+    for rocket in rockets.iter() {
+        let (rc, gc, bc) = rocket.color;
+
+        // Trail
+        if rocket.trail.len() > 1 && rocket.trail_alpha > 0.01 {
+            let n = rocket.trail.len();
+            cr.set_line_width(FIREWORKS_ROCKET_LINE_WIDTH);
+            cr.set_line_cap(cairo::LineCap::Round);
+            for i in 1..n {
+                let alpha = (i as f64 / n as f64) * rocket.trail_alpha * 0.8;
+                cr.set_source_rgba(rc, gc, bc, alpha);
+                cr.move_to(rocket.trail[i - 1].0, rocket.trail[i - 1].1);
+                cr.line_to(rocket.trail[i].0, rocket.trail[i].1);
+                let _ = cr.stroke();
+            }
+        }
+
+        // Bright head while rising
+        if rocket.phase == RocketPhase::Rising {
+            let hs = FIREWORKS_HEAD_SIZE / 2.0;
+            cr.set_source_rgba(rc, gc, bc, 0.95);
+            rounded_rect(cr, rocket.x - hs, rocket.y - hs, FIREWORKS_HEAD_SIZE, FIREWORKS_HEAD_SIZE, hs);
+            let _ = cr.fill();
+        }
+
+        // Sparks
+        cr.set_line_width(FIREWORKS_SPARK_LINE_WIDTH);
+        cr.set_line_cap(cairo::LineCap::Round);
+        for spark in &rocket.sparks {
+            if spark.life <= 0.0 {
+                continue;
+            }
+            let alpha = spark.life.clamp(0.0, 1.0) * 0.9;
+            cr.set_source_rgba(rc, gc, bc, alpha);
+
+            let speed = (spark.vx * spark.vx + spark.vy * spark.vy).sqrt();
+            let line_len = (speed * 0.04).clamp(2.0, 10.0);
+            let (nx, ny) = if speed > 0.01 {
+                (spark.vx / speed, spark.vy / speed)
+            } else {
+                (0.0, -1.0)
+            };
+
+            cr.move_to(spark.x - nx * line_len, spark.y - ny * line_len);
+            cr.line_to(spark.x, spark.y);
+            let _ = cr.stroke();
+        }
+    }
 }
 
 // ── Assistant panel ───────────────────────────────────────────────
@@ -826,30 +1100,29 @@ fn draw_keyboard_button(cr: &cairo::Context, state: &PillState, ww: f64, wh: f64
 }
 
 fn draw_cancel_button(cr: &cairo::Context, state: &PillState, ww: f64, wh: f64) {
-    let is_idle = state.phase.get() == Phase::Idle;
-    let hovered = state.hovered.get();
-
-    if is_idle || !hovered || state.assistant_active.get() {
+    let t = state.cancel_t.get();
+    if t < 0.01 {
         return;
     }
 
     let (pill_x, pill_y, pill_w, _) = pill_position(state, ww, wh);
     let btn_x = pill_x + pill_w - CANCEL_BUTTON_SIZE / 2.0 + 2.0;
     let btn_y = pill_y - CANCEL_BUTTON_SIZE / 2.0 - 2.0;
-
-    cr.arc(
-        btn_x + CANCEL_BUTTON_SIZE / 2.0,
-        btn_y + CANCEL_BUTTON_SIZE / 2.0,
-        CANCEL_BUTTON_SIZE / 2.0,
-        0.0, TAU,
-    );
-    cr.set_source_rgba(0.46, 0.46, 0.46, 1.0);
-    let _ = cr.fill();
-
     let cx = btn_x + CANCEL_BUTTON_SIZE / 2.0;
     let cy = btn_y + CANCEL_BUTTON_SIZE / 2.0;
+
+    let scale = 0.5 + 0.5 * t;
+    cr.save().ok();
+    cr.translate(cx, cy);
+    cr.scale(scale, scale);
+    cr.translate(-cx, -cy);
+
+    cr.arc(cx, cy, CANCEL_BUTTON_SIZE / 2.0, 0.0, TAU);
+    cr.set_source_rgba(0.46, 0.46, 0.46, t);
+    let _ = cr.fill();
+
     let s = 3.5;
-    cr.set_source_rgba(1.0, 1.0, 1.0, 1.0);
+    cr.set_source_rgba(1.0, 1.0, 1.0, t);
     cr.set_line_width(1.5);
     cr.set_line_cap(cairo::LineCap::Round);
     cr.move_to(cx - s, cy - s);
@@ -859,10 +1132,14 @@ fn draw_cancel_button(cr: &cairo::Context, state: &PillState, ww: f64, wh: f64) 
     cr.line_to(cx - s, cy + s);
     let _ = cr.stroke();
 
-    state.click_regions.borrow_mut().push(ClickRegion {
-        x: btn_x, y: btn_y, w: CANCEL_BUTTON_SIZE, h: CANCEL_BUTTON_SIZE,
-        action: ClickAction::CancelDictation,
-    });
+    cr.restore().ok();
+
+    if t > 0.5 {
+        state.click_regions.borrow_mut().push(ClickRegion {
+            x: btn_x, y: btn_y, w: CANCEL_BUTTON_SIZE, h: CANCEL_BUTTON_SIZE,
+            action: ClickAction::CancelDictation,
+        });
+    }
 }
 
 fn draw_wrench_icon(cr: &cairo::Context, x: f64, y: f64, size: f64, alpha: f64) {

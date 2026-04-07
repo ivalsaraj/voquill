@@ -5,6 +5,17 @@ use crate::draw::pill_position;
 use crate::gfx;
 use crate::state::{ClickAction, PillState};
 
+fn has_flash_action_at(state: &PillState, x: f64, y: f64) -> bool {
+    if state.flash_action.borrow().is_none() || state.flash_t.get() < 0.5 {
+        return false;
+    }
+    // Check against the actual click regions registered by the draw code,
+    // since the flash can be wider than the draw area (it extends into the
+    // content-offset margins). The FlashAction region has exact coordinates.
+    let regions = state.click_regions.borrow();
+    regions.iter().any(|r| matches!(r.action, ClickAction::FlashAction) && r.contains(x, y))
+}
+
 pub(crate) fn handle_click(state: &PillState, x: f64, y: f64) {
     let s = state.ui_scale;
     let (ox, oy) = state.content_offset();
@@ -65,6 +76,15 @@ pub(crate) fn handle_click(state: &PillState, x: f64, y: f64) {
                         *state.entry_text.borrow_mut() = String::new();
                     }
                 }
+                ClickAction::FlashAction => {
+                    if let Some(ref action) = *state.flash_action.borrow() {
+                        ipc::send(&OutMessage::ToastAction { action: action.clone() });
+                    }
+                    state.flash_visible.set(false);
+                    state.flash_timer.set(0.0);
+                    *state.flash_action.borrow_mut() = None;
+                    *state.flash_action_label.borrow_mut() = None;
+                }
             }
             return;
         }
@@ -76,10 +96,9 @@ pub(crate) fn handle_scroll(state: &PillState, delta_y: f64) {
         return;
     }
 
-    let dy = delta_y * 30.0;
     let current = state.scroll_offset.get();
     let max_scroll = (state.content_height.get() - state.viewport_height.get()).max(0.0);
-    let new_offset = (current + dy).clamp(0.0, max_scroll);
+    let new_offset = (current - delta_y).clamp(0.0, max_scroll);
     state.scroll_offset.set(new_offset);
     state.should_stick.set(max_scroll - new_offset <= 32.0);
 }
@@ -187,6 +206,11 @@ pub(crate) fn is_interactive_at(state: &PillState, x: f64, y: f64) -> bool {
         {
             return true;
         }
+    }
+
+    // Flash message with action button
+    if has_flash_action_at(state, x, y) {
+        return true;
     }
 
     false

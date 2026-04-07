@@ -1,9 +1,10 @@
+import { invoke } from "@tauri-apps/api/core";
 import type {
   RouteTranscriptOutputArgs,
   RouteTranscriptOutputResult,
 } from "@voquill/types";
-import { invoke } from "@tauri-apps/api/core";
 import { getAppState } from "../store";
+import { sanitizeIndentation } from "./string.utils";
 import { getMyUserPreferences } from "./user.utils";
 
 export const routeTranscriptOutput = async (
@@ -40,7 +41,7 @@ export const routeTranscriptOutput = async (
   const pasteKeybind =
     state.supportsPasteKeybinds === "global"
       ? (prefs?.pasteKeybind ?? null)
-      : (currentApp?.pasteKeybind ?? null);
+      : (currentApp?.pasteKeybind ?? prefs?.pasteKeybind ?? null);
 
   await insertLocalTranscriptOutput(args.text, pasteKeybind);
 
@@ -55,7 +56,7 @@ export const insertLocalTranscriptOutput = async (
   keybind: string | null,
 ): Promise<void> => {
   await invoke<void>("paste", {
-    text,
+    text: sanitizeIndentation(text),
     keybind,
   });
 };

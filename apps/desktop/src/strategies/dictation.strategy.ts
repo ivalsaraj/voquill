@@ -1,13 +1,13 @@
-import type { Nullable } from "@voquill/types";
 import { invoke } from "@tauri-apps/api/core";
+import type { Nullable } from "@voquill/types";
 import { showErrorSnackbar, showSnackbar } from "../actions/app.actions";
+import { tryRegisterCurrentAppTarget } from "../actions/app-target.actions";
 import { showToast } from "../actions/toast.actions";
 import {
   postProcessTranscript,
   type PostProcessMetadata,
 } from "../actions/transcribe.actions";
 import { getIntl } from "../i18n";
-import { routeTranscriptOutput } from "../utils/output-routing.utils";
 import { getAppState } from "../store";
 import type { OverlayPhase } from "../types/overlay.types";
 import type {
@@ -17,18 +17,24 @@ import type {
 } from "../types/strategy.types";
 import { getLogger } from "../utils/log.utils";
 import { getMemberExceedsLimitByState } from "../utils/member.utils";
+import { routeTranscriptOutput } from "../utils/output-routing.utils";
 import {
   applyReplacements,
   applySymbolConversions,
 } from "../utils/string.utils";
 import { getToneIdToUse, VERBATIM_TONE_ID } from "../utils/tone.utils";
-import { getMyUserPreferences } from "../utils/user.utils";
+import {
+  getEffectivePostProcessingMode,
+  getEffectiveTranscriptionMode,
+  getMyUserPreferences,
+} from "../utils/user.utils";
 import { BaseStrategy } from "./base.strategy";
 
 export class DictationStrategy extends BaseStrategy {
   private streamedSegmentCount = 0;
   private streamedProcessedText = "";
   private pasteQueue: Promise<void> = Promise.resolve();
+  private currentAppId: string | null = null;
 
   shouldStoreTranscript(): boolean {
     return true;
@@ -66,14 +72,14 @@ export class DictationStrategy extends BaseStrategy {
 
     this.pasteQueue = this.pasteQueue.then(async () => {
       const text = sanitized;
-      const textToPaste = (isFirst ? "" : " ") + text;
+      const textToPaste = text + " ";
       this.streamedProcessedText += (isFirst ? "" : " ") + text;
 
       try {
         await routeTranscriptOutput({
           text: textToPaste,
           mode: "dictation",
-          currentAppId: null,
+          currentAppId: this.currentAppId,
         });
       } catch (error) {
         getLogger().error(`Failed to paste interim segment: ${error}`);
@@ -97,8 +103,8 @@ export class DictationStrategy extends BaseStrategy {
   validateAvailability(): Nullable<StrategyValidationError> {
     const state = getAppState();
 
-    const transcriptionMode = state.settings.aiTranscription.mode;
-    const generativeMode = state.settings.aiPostProcessing.mode;
+    const transcriptionMode = getEffectiveTranscriptionMode(state);
+    const generativeMode = getEffectivePostProcessingMode(state);
     const isCloud = transcriptionMode === "cloud" || generativeMode === "cloud";
     if (isCloud && getMemberExceedsLimitByState(state)) {
       return {
@@ -115,8 +121,18 @@ export class DictationStrategy extends BaseStrategy {
     return null;
   }
 
+  async loadAppTarget(): Promise<void> {
+    try {
+      const appTarget = await tryRegisterCurrentAppTarget();
+      this.currentAppId = appTarget?.id ?? null;
+    } catch {
+      getLogger().verbose("Failed to resolve current app target at start");
+    }
+  }
+
   async onBeforeStart(): Promise<void> {
-    // No special setup for dictation
+    // load asyncronously, non-blocking
+    this.loadAppTarget();
   }
 
   async setPhase(phase: OverlayPhase): Promise<void> {
@@ -127,25 +143,8 @@ export class DictationStrategy extends BaseStrategy {
     args: HandleTranscriptParams,
   ): Promise<HandleTranscriptResult> {
     const sanitizedTranscript = this.sanitizeTranscript(args.rawTranscript);
-    let remoteStatus: "sent" | null = null;
-    const remoteDeviceId = this.getActiveRemoteTargetDeviceId();
 
     await this.pasteQueue;
-    try {
-      const result = await routeTranscriptOutput({
-        text: " ",
-        mode: "dictation",
-        currentAppId: args.currentApp?.id ?? null,
-      });
-      if (result.remote && result.delivered) {
-        remoteStatus = "sent";
-        showSnackbar("Transcript sent to paired receiver.", {
-          mode: "success",
-        });
-      }
-    } catch {
-      // Non-critical trailing space
-    }
 
     const transcript = this.streamedProcessedText || sanitizedTranscript;
     getLogger().verbose(
@@ -158,8 +157,8 @@ export class DictationStrategy extends BaseStrategy {
       sanitizedTranscript,
       postProcessMetadata: {},
       postProcessWarnings: [],
-      remoteStatus,
-      remoteDeviceId: remoteStatus ? remoteDeviceId : null,
+      remoteStatus: null,
+      remoteDeviceId: null,
     };
   }
 
@@ -225,8 +224,7 @@ export class DictationStrategy extends BaseStrategy {
       postProcessWarnings.push(errorMessage);
 
       await showToast({
-        title: "Transcription failed",
-        message: errorMessage,
+        message: "Transcription failed",
         toastType: "error",
       });
     }

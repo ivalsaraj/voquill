@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { AppTarget } from "@voquill/types";
+import { delayed } from "@voquill/utilities";
 import { secondsToMilliseconds } from "framer-motion";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useIntl } from "react-intl";
@@ -56,6 +57,12 @@ import {
 } from "../../utils/analytics.utils";
 import { getIsAssistantModeEnabled } from "../../utils/assistant-mode.utils";
 import { playAlertSound, tryPlayAudioChime } from "../../utils/audio.utils";
+import {
+  DEFAULT_DICTATION_LIMIT_MINUTES,
+  getDictationRecordingTimerDurations,
+  getEffectiveDictationLimitMinutes,
+  shouldEnableDictationLimit,
+} from "../../utils/dictation-limit.utils";
 import { getEffectiveStylingMode } from "../../utils/feature.utils";
 import { createId } from "../../utils/id.utils";
 import {
@@ -67,14 +74,7 @@ import {
   SWITCH_WRITING_STYLE_HOTKEY,
   syncHotkeyCombosToNative,
 } from "../../utils/keyboard.utils";
-import {
-  DEFAULT_DICTATION_LIMIT_MINUTES,
-  getDictationRecordingTimerDurations,
-  getEffectiveDictationLimitMinutes,
-  shouldEnableDictationLimit,
-} from "../../utils/dictation-limit.utils";
 import { getLogger } from "../../utils/log.utils";
-import { flashPillTooltip } from "../../utils/overlay.utils";
 import {
   getActiveManualToneIds,
   getManuallySelectedToneId,
@@ -84,6 +84,7 @@ import {
 import {
   getEffectivePillVisibility,
   getIsDictationUnlocked,
+  getIsOnboarded,
   getMyPreferredMicrophone,
   getMyPrimaryDictationLanguage,
   getMyUserPreferences,
@@ -130,15 +131,6 @@ export const DictationSideEffects = () => {
   const additionalLanguageEntries = useAppStore(getAdditionalLanguageEntries);
   const isDictationUnlocked = useAppStore(getIsDictationUnlocked);
   const isDictationInteractable = isDictationUnlocked && !isStopping;
-  const pillHoverEnabled = useAppStore((state) => {
-    if (!getIsDictationUnlocked(state)) {
-      return false;
-    }
-    const visibility = getEffectivePillVisibility(
-      state.userPrefs?.dictationPillVisibility,
-    );
-    return visibility === "persistent";
-  });
   const pillVisibility = useAppStore((state) =>
     getEffectivePillVisibility(state.userPrefs?.dictationPillVisibility),
   );
@@ -225,7 +217,6 @@ export const DictationSideEffects = () => {
       draft.dictationLanguageOverride = null;
       draft.assistantInputMode = "voice";
     });
-    invoke("set_overlay_focusable", { focusable: false }).catch(console.error);
   }, []);
 
   const hardResetHotkeyState = useCallback(() => {
@@ -268,11 +259,6 @@ export const DictationSideEffects = () => {
       if (message) {
         playAlertSound();
         showToast({
-          title:
-            message.title ||
-            intl.formatMessage({
-              defaultMessage: "Recording stopped",
-            }),
           message: String(message.body),
           toastType: "error",
           duration: 8_000,
@@ -326,10 +312,9 @@ export const DictationSideEffects = () => {
         } catch (error) {
           getLogger().error(`Failed to stop recording: ${error}`);
           showToast({
-            title: intl.formatMessage({
+            message: intl.formatMessage({
               defaultMessage: "Failed to stop recording",
             }),
-            message: String(error),
             toastType: "error",
             duration: 8_000,
           });
@@ -437,6 +422,11 @@ export const DictationSideEffects = () => {
       return;
     }
 
+    const hasOnboarded = getIsOnboarded(getAppState());
+    if (hasOnboarded) {
+      delayed(2000).then(() => recordStreak());
+    }
+
     getLogger().info("stopRecording entered");
     isStoppingRef.current = true;
     setIsStopping(true);
@@ -487,12 +477,8 @@ export const DictationSideEffects = () => {
           `Recording duration warning (${dictationLimitMinutes} min limit)`,
         );
         showToast({
-          title: intl.formatMessage({
-            defaultMessage: "Recording ending soon",
-          }),
           message: intl.formatMessage({
-            defaultMessage:
-              "Audio recording will automatically stop in 60 seconds.",
+            defaultMessage: "Recording will stop in 60 seconds",
           }),
           toastType: "info",
           duration: 5_000,
@@ -506,12 +492,8 @@ export const DictationSideEffects = () => {
           `Recording auto-stopped (${dictationLimitMinutes} min limit)`,
         );
         showToast({
-          title: intl.formatMessage({
-            defaultMessage: "Recording stopped",
-          }),
           message: intl.formatMessage({
-            defaultMessage:
-              "Audio recording was automatically stopped due to duration limit.",
+            defaultMessage: "Recording stopped: duration limit reached",
           }),
           toastType: "info",
           duration: 5_000,
@@ -611,10 +593,9 @@ export const DictationSideEffects = () => {
         );
 
         showToast({
-          title: intl.formatMessage({
+          message: intl.formatMessage({
             defaultMessage: "Recording failed",
           }),
-          message: String(error),
           toastType: "error",
           duration: 8_000,
         });
@@ -637,9 +618,12 @@ export const DictationSideEffects = () => {
       return;
     }
 
-    recordStreak();
     getLogger().info("Starting dictation recording");
     trackDictationStart();
+    produceAppState((draft) => {
+      draft.local.lastDictatedAt = Date.now();
+    });
+
     await startRecording({ mode: "dictate" });
   }, [startRecording]);
 
@@ -660,12 +644,8 @@ export const DictationSideEffects = () => {
       produceAppState((draft) => {
         draft.assistantInputMode = "voice";
       });
-      invoke("set_overlay_focusable", { focusable: false }).catch(
-        console.error,
-      );
     }
 
-    recordStreak();
     getLogger().info("Starting agent recording");
     trackAgentStart();
     await startRecording({ mode: "agent" });
@@ -681,7 +661,6 @@ export const DictationSideEffects = () => {
     const elapsed = now - lastStyleSwitchRef.current;
     lastStyleSwitchRef.current = now;
     if (elapsed > secondsToMilliseconds(3)) {
-      flashPillTooltip();
       return;
     }
 
@@ -702,12 +681,8 @@ export const DictationSideEffects = () => {
     }, CANCEL_PROMPT_DURATION);
 
     void showToast({
-      title: intl.formatMessage({
-        defaultMessage: "Cancel transcription?",
-      }),
       message: intl.formatMessage({
-        defaultMessage:
-          "Press the 'cancel' hotkey again to discard the transcript.",
+        defaultMessage: "Press cancel again to discard transcript",
       }),
       toastType: "info",
       action: "confirm_cancel_transcription",
@@ -788,7 +763,6 @@ export const DictationSideEffects = () => {
     produceAppState((draft) => {
       draft.assistantInputMode = "type";
     });
-    await invoke("set_overlay_focusable", { focusable: true });
   });
 
   useTauriListen<{ text: string }>(
@@ -879,12 +853,6 @@ export const DictationSideEffects = () => {
       resolveToolPermission(payload.permissionId, payload.status);
     },
   );
-
-  useEffect(() => {
-    invoke("set_pill_hover_enabled", { enabled: pillHoverEnabled }).catch(
-      console.error,
-    );
-  }, [pillHoverEnabled]);
 
   useEffect(() => {
     invoke("set_pill_visibility", { visibility: pillVisibility }).catch(

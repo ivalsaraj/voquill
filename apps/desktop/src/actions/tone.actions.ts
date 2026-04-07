@@ -9,7 +9,6 @@ import {
   getManuallySelectedToneId,
   getToneById,
 } from "../utils/tone.utils";
-import { flashPillTooltip } from "../utils/overlay.utils";
 import { showErrorSnackbar, showSnackbar } from "./app.actions";
 import { showToast } from "./toast.actions";
 import { activateAndSelectTone, setSelectedToneId } from "./user.actions";
@@ -142,13 +141,9 @@ const cycleWritingStyle = async (direction: 1 | -1): Promise<void> => {
   if (activeIds.length <= 1) {
     const toneName = getToneById(state, currentId)?.name ?? currentId;
     await showToast({
-      title: intl.formatMessage({
-        defaultMessage: "Writing style not changed",
-      }),
       message: intl.formatMessage(
         {
-          defaultMessage:
-            '"{toneName}" is your only active style. Add more styles from the writing styles menu.',
+          defaultMessage: '"{toneName}" is your only active style',
         },
         { toneName },
       ),
@@ -162,8 +157,6 @@ const cycleWritingStyle = async (direction: 1 | -1): Promise<void> => {
     (currentIndex + direction + activeIds.length) % activeIds.length;
   const nextId = activeIds[nextIndex];
   await setSelectedToneId(nextId);
-
-  flashPillTooltip();
 };
 
 export const switchWritingStyleForward = () => cycleWritingStyle(1);
